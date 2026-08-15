@@ -1,0 +1,69 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "dev",
+      "displayName": "Dev",
+      "description": "Debug host layer over an /O2 engine, which is the only way playback keeps up",
+      "inherits": "base",
+      "cacheVariables": {
+        "TSGUI_FAST_DEBUG": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "inherits": "base"
+    },
+    {
+      "name": "asan",
+      "displayName": "ASan",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_CXX_FLAGS": "/fsanitize=address /Zi",
+        "CMAKE_EXE_LINKER_FLAGS": "/INCREMENTAL:NO",
+        "TSGUI_FAST_DEBUG": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev", "configuration": "Debug" },
+    { "name": "release", "configurePreset": "release", "configuration": "RelWithDebInfo" },
+    { "name": "asan", "configurePreset": "asan", "configuration": "Debug" }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "configuration": "Debug",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "RelWithDebInfo",
+      "output": { "outputOnFailure": true }
+    }
+  ]
+}
