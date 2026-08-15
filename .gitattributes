@@ -1,0 +1,22 @@
+# Normalise to LF in the repository, whatever the working tree uses.
+#
+# This matters more here than in the other two ports: MSBuild and PowerShell are perfectly happy
+# with LF, but git on Windows defaults to converting on checkout, and without this the first commit
+# from a Linux machine would rewrite every line of every file.
+* text=auto eol=lf
+
+# Windows-only tooling that some editors and shells are fussier about.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.vcxproj text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.props text eol=crlf
+*.appxmanifest text eol=crlf
+
+# Resource catalogues are UTF-8 XML and must not be mangled.
+*.resw text eol=crlf
+
+*.png binary
+*.ico binary
+*.pfx binary
