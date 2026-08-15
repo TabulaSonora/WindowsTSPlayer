@@ -1,0 +1,41 @@
+# Nothing Roland-derived is ever committed. See NOTICE.md.
+#
+# The first block is the load-bearing one: SCCore.dll is Roland's 24 MB wave ROM, and everything
+# generated from it -- extracted tables, differential fixtures, rendered audio -- carries the same
+# rights. The generators say so themselves ("Roland-derived output: generate locally, do not
+# redistribute"). These patterns are deliberately broad and deliberately first.
+SCCore.dll
+SCCore*.dll
+tables/
+fixtures/
+*.wav
+
+# Build output
+build/
+out/
+compile_commands.json
+.cache/
+
+# vcpkg
+vcpkg_installed/
+
+# MSBuild / Visual Studio / WinUI
+.vs/
+x64/
+Debug/
+Release/
+obj/
+bin/
+*.user
+*.aps
+Generated Files/
+packages/
+
+# MSIX packaging and signing. A signing certificate must never be committed.
+AppPackages/
+BundleArtifacts/
+*.pfx
+*.cer
+*.appx
+*.msix
+*.msixbundle
