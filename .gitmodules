@@ -1,0 +1,3 @@
+[submodule "nativets"]
+	path = nativets
+	url = https://github.com/TabulaSonora/NativeTS.git
