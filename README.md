@@ -1,5 +1,7 @@
 # Tabula Sonora Player for Windows
 
+[![build](https://github.com/TabulaSonora/WindowsTSPlayer/actions/workflows/build.yml/badge.svg)](https://github.com/TabulaSonora/WindowsTSPlayer/actions/workflows/build.yml)
+
 A native WinUI 3 front end for [NativeTS](https://github.com/TabulaSonora/NativeTS), a C++
 reimplementation of the Roland Sound Canvas VA synthesizer voice.
 
