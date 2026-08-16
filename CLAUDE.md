@@ -130,6 +130,30 @@ with the error it causes; the short version:
 a `factory_implementation::App` the XAML-generated headers do not define. `MainWindow` is the
 opposite case and must be declared.
 
+## Activation, and two things that are not what the documentation implies
+
+`DISABLE_XAML_GENERATED_MAIN` is set, and `wWinMain` in `App.xaml.cpp` does the whole job — the
+apartment, the single-instance question, `Application::Start`, constructing `App`. **Do not shorten
+it to a redirect plus a call to the generated `wXamlGeneratedMain()`.** That was tried. Under the
+define, the generated body only constructs `App` when a `decltype(App())` SFINAE probe says it can,
+and MSVC answers *false* — a C++/WinRT implementation type has a non-public destructor, which is the
+very thing the probe is written to see past. `Application::Start` then runs with no `Application`
+ever created and the process dies about a second in, inside `Microsoft.UI.Xaml.dll`, with a stowed
+exception (`0xc000027b`), no window, and nothing naming the cause. The generated helper also calls
+`init_apartment` a second time.
+
+**A full-trust packaged desktop app does not implement the UWP file contract.** Asking the shell to
+activate one through it fails with `0x80270254`, "this app does not support the contract specified".
+The shell hands such a program its file on the *command line*, the way it always has for a Win32
+program, so `ExtendedActivationKind::Launch` is the branch a double-click actually takes and
+`::File` is there only because the App SDK's arguments are documented to carry it.
+
+Two consequences worth keeping: a redirected activation must be read from
+`ILaunchActivatedEventArgs::Arguments()` and **not** from `GetCommandLineW()`, which is the receiving
+process's own and makes the running instance reopen the song it is already playing; and
+`RedirectActivationToAsync` failing must not be treated as success, because a registration outlives a
+process that dies without unregistering, and a caller that exits anyway simply never starts.
+
 ## Testing
 
 `export-matches-cli` is the load-bearing one, unchanged in intent from the Linux build: it renders

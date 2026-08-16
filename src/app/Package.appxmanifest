@@ -58,11 +58,47 @@
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
 
-      <!--
-        File associations are deliberately absent until they are the thing being tested. This
-        milestone is proving the CMake/MSBuild seam, and an association registered by a
-        half-finished build is a shell entry that outlives the build that made it.
-      -->
+      <Extensions>
+        <!--
+          The twelve extensions the Linux front end accepts, verbatim, and this single block replaces
+          both halves of what that build needed: the desktop entry's MimeType line and the whole
+          107-line shared-mime-info XML beside it. Windows dispatches on extension alone, so the
+          magic-number rules that file existed to carry have no counterpart here and are not a loss.
+
+          One association rather than twelve. They are one kind of thing to a reader, they are opened
+          by one program in one way, and twelve entries would be twelve rows in the Default Apps list
+          saying the same sentence.
+
+          Note .lds among them. It is the one format with no magic number at all, recognised by its
+          extension and nothing else, which is what made the two-separator fix in Session::file_name
+          load-bearing rather than cosmetic.
+
+          AllowSilentDefaultTakeOver is left at its default of false, deliberately. Set true, this
+          would seize .mid from whatever holds it the moment the package registers; left alone, the
+          program appears in "Open with" and waits to be chosen. Taking a file type without being
+          asked is the behaviour that makes people uninstall media players.
+        -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="midi">
+            <uap:DisplayName>MIDI sequence</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.mid</uap:FileType>
+              <uap:FileType>.midi</uap:FileType>
+              <uap:FileType>.rmi</uap:FileType>
+              <uap:FileType>.mids</uap:FileType>
+              <uap:FileType>.mus</uap:FileType>
+              <uap:FileType>.xmi</uap:FileType>
+              <uap:FileType>.xmf</uap:FileType>
+              <uap:FileType>.mxmf</uap:FileType>
+              <uap:FileType>.gmf</uap:FileType>
+              <uap:FileType>.hmi</uap:FileType>
+              <uap:FileType>.hmp</uap:FileType>
+              <uap:FileType>.lds</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

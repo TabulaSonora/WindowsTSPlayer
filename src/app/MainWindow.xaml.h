@@ -14,6 +14,17 @@ namespace winrt::WindowsTSPlayer::implementation
 
         WindowsTSPlayer::PlayerModel Model() const { return model_; }
 
+        /// Opens a song that arrived from a file association or the command line.
+        ///
+        /// Not a projected method -- nothing outside this program calls it, and App reaches it
+        /// through get_self like everything else that crosses that boundary.
+        ///
+        /// A file named before the ROM is loaded is stashed rather than refused. The first run of a
+        /// fresh install is exactly the case where someone double-clicks a .mid, and "no ROM yet" is
+        /// a state that lasts a few hundred milliseconds on every later launch besides -- refusing on
+        /// that basis would be a race the reader loses at random.
+        void OpenActivatedFile(hstring path);
+
         winrt::fire_and_forget OnOpenRomClick(
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
         winrt::fire_and_forget OnOpenSongClick(
@@ -43,6 +54,13 @@ namespace winrt::WindowsTSPlayer::implementation
         /// Loads the imported ROM, if there is one.
         winrt::fire_and_forget RestoreRom();
 
+        /// Plays whatever was stashed while there was no ROM, and forgets it.
+        winrt::fire_and_forget OpenPendingSong();
+
+        /// Opens a song and files it under recents, which is the whole of what an activation does
+        /// once there is a ROM to play it on.
+        winrt::fire_and_forget OpenActivatedSong(hstring path);
+
         winrt::Windows::Foundation::IAsyncOperation<bool> OpenSong(hstring path);
 
         void RememberSong(Windows::Storage::StorageFile const& file);
@@ -65,6 +83,9 @@ namespace winrt::WindowsTSPlayer::implementation
 
         std::unique_ptr<tsgui::SettingsStore> settings_;
         WindowsTSPlayer::PlayerModel model_{ nullptr };
+
+        /// A song named before there was a ROM to play it on. Empty the rest of the time.
+        hstring pendingSong_;
 
         /// The song information window, while one is open.
         ///

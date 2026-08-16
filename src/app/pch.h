@@ -25,6 +25,11 @@
 #include <winrt/Windows.ApplicationModel.DataTransfer.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>
 
+// AppInstance, which is what makes this program single-instance and what carries a file activation
+// to the copy already running. In Microsoft.Windows.*, not Windows.*: the ApplicationModel one is
+// the UWP lifecycle and knows nothing about a packaged desktop process.
+#include <winrt/Microsoft.Windows.AppLifecycle.h>
+
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>

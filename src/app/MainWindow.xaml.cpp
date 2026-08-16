@@ -8,6 +8,7 @@
 #include "MixerView.xaml.h"
 #include "PlayerModel.h"
 #include "PrefsDialog.h"
+#include "SongFormats.h"
 #include "SongInfoWindow.h"
 #include "TransportView.xaml.h"
 #include "WindowChrome.h"
@@ -44,29 +45,6 @@ namespace {
 /// for as long as the copy takes, and a launch during that window loads it.
 constexpr wchar_t rom_name[] = L"SCCore.dll";
 constexpr wchar_t rom_staging_name[] = L"SCCore.dll.importing";
-
-/// The twelve extensions the Linux front end accepts, verbatim. LDS is the one worth noting: it has
-/// no magic number and is recognised by its extension alone, which is what made the two-separator
-/// fix in Session::file_name load-bearing rather than cosmetic.
-constexpr const wchar_t* song_extensions[] = { L".mid",  L".midi", L".rmi", L".mids",
-                                               L".mus",  L".xmi",  L".xmf", L".mxmf",
-                                               L".gmf",  L".hmi",  L".hmp", L".lds" };
-
-bool IsSong(std::wstring_view name)
-{
-    const auto dot = name.find_last_of(L'.');
-    if (dot == std::wstring_view::npos) {
-        return false;
-    }
-    std::wstring extension{ name.substr(dot) };
-    std::transform(extension.begin(), extension.end(), extension.begin(), ::towlower);
-    for (const auto* candidate : song_extensions) {
-        if (extension == candidate) {
-            return true;
-        }
-    }
-    return false;
-}
 
 } // namespace
 
@@ -299,6 +277,10 @@ namespace winrt::WindowsTSPlayer::implementation
         StatusText().Text(model_.RomName());
         OpenSongButton().IsEnabled(true);
         RecentButton().IsEnabled(true);
+
+        // Whatever was named before there was a ROM to play it on. Both paths that load a ROM end
+        // here, because a file can arrive before either of them finishes.
+        OpenPendingSong();
     }
 
     fire_and_forget MainWindow::RestoreRom()
@@ -337,6 +319,10 @@ namespace winrt::WindowsTSPlayer::implementation
         StatusText().Text(model_.RomName());
         OpenSongButton().IsEnabled(true);
         RecentButton().IsEnabled(true);
+
+        // Whatever was named before there was a ROM to play it on. Both paths that load a ROM end
+        // here, because a file can arrive before either of them finishes.
+        OpenPendingSong();
     }
 
     fire_and_forget MainWindow::OnOpenRomClick(IInspectable const&, RoutedEventArgs const&)
@@ -386,6 +372,58 @@ namespace winrt::WindowsTSPlayer::implementation
         co_return true;
     }
 
+    void MainWindow::OpenActivatedFile(hstring path)
+    {
+        if (path.empty()) {
+            return;
+        }
+
+        // No ROM yet, so this waits. Two ways in reach this state and both are ordinary: a fresh
+        // install where the ROM has never been imported, and every launch at all, because the ROM is
+        // read from storage asynchronously and a file activation arrives while that is still in
+        // flight. Refusing here would fail for reasons of timing rather than of fact.
+        if (model_.RomName().empty()) {
+            pendingSong_ = path;
+            StatusText().Text(L"Waiting for SCCore.dll before playing that.");
+            return;
+        }
+
+        OpenActivatedSong(path);
+    }
+
+    fire_and_forget MainWindow::OpenPendingSong()
+    {
+        auto lifetime = get_strong();
+
+        // Taken and cleared before the first suspension, so a second activation landing during the
+        // load is a new pending file rather than a second attempt at this one.
+        const hstring path = std::exchange(pendingSong_, hstring{});
+        if (path.empty()) {
+            co_return;
+        }
+
+        OpenActivatedSong(path);
+    }
+
+    fire_and_forget MainWindow::OpenActivatedSong(hstring path)
+    {
+        auto lifetime = get_strong();
+
+        if (co_await OpenSong(path)) {
+            // Remembered like any other opening. A file reached through Explorer is one somebody
+            // chose just as deliberately as one reached through the picker, and leaving it out of the
+            // recent list would make that list quietly wrong about what had been played.
+            try {
+                RememberSong(co_await StorageFile::GetFileFromPathAsync(path));
+                RebuildRecentMenu();
+            } catch (const hresult_error&) {
+                // The song opened but the file cannot be reached through the storage API, which
+                // happens for paths the broker will not hand back. The song is playing; the recent
+                // list is one entry short. Not worth telling anyone about.
+            }
+        }
+    }
+
     fire_and_forget MainWindow::OnOpenSongClick(IInspectable const&, RoutedEventArgs const&)
     {
         auto lifetime = get_strong();
@@ -393,7 +431,7 @@ namespace winrt::WindowsTSPlayer::implementation
         FileOpenPicker picker;
         picker.as<::IInitializeWithWindow>()->Initialize(Hwnd());
         picker.SuggestedStartLocation(PickerLocationId::MusicLibrary);
-        for (const auto* extension : song_extensions) {
+        for (const auto* extension : tsgui::kSongExtensions) {
             picker.FileTypeFilter().Append(extension);
         }
 
@@ -496,7 +534,7 @@ namespace winrt::WindowsTSPlayer::implementation
                 continue;
             }
 
-            if (IsSong(std::wstring_view{ file.Name() })) {
+            if (tsgui::IsSongFile(std::wstring_view{ file.Name() })) {
                 if (co_await OpenSong(file.Path())) {
                     RememberSong(file);
                     RebuildRecentMenu();
