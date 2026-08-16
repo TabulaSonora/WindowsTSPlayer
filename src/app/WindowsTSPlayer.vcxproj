@@ -229,6 +229,7 @@
     </ClCompile>
     <ClCompile Include="PartModel.cpp" />
     <ClCompile Include="PlayerModel.cpp" />
+    <ClCompile Include="MediaControls.cpp" />
     <ClCompile Include="PrefsDialog.cpp" />
     <ClCompile Include="SettingsRows.cpp" />
     <ClCompile Include="SettingsStore.cpp" />
@@ -276,6 +277,7 @@
     <ClInclude Include="PartModel.h" />
     <ClInclude Include="PlayerModel.h" />
     <ClInclude Include="Activation.h" />
+    <ClInclude Include="MediaControls.h" />
     <ClInclude Include="PrefsDialog.h" />
     <ClInclude Include="SettingsRows.h" />
     <ClInclude Include="SettingsStore.h" />

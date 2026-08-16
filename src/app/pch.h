@@ -30,6 +30,9 @@
 // the UWP lifecycle and knows nothing about a packaged desktop process.
 #include <winrt/Microsoft.Windows.AppLifecycle.h>
 
+// SystemMediaTransportControls: the now-playing flyout and the media keys.
+#include <winrt/Windows.Media.h>
+
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
 #include <winrt/Microsoft.UI.Xaml.h>

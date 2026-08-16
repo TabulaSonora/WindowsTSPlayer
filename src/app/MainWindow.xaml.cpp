@@ -116,6 +116,12 @@ namespace winrt::WindowsTSPlayer::implementation
             model_.PropertyChanged(propertyToken_);
             model_.VisibleParts().VectorChanged(vectorToken_);
 
+            // The shell first: it holds the model, and it is the one thing here that would leave a
+            // visible trace of this program after it had gone.
+            if (media_) {
+                media_->Shutdown();
+            }
+
             // Told to stop, rather than left to stop when its last reference goes.
             //
             // **This window is not the model's last owner**, and believing it was is what made the
@@ -132,6 +138,10 @@ namespace winrt::WindowsTSPlayer::implementation
             Mixer().Model(nullptr);
             model_ = nullptr;
         });
+
+        // After the chrome, because GetForWindow needs the HWND this window has only once it has
+        // been through InitializeComponent, and after the model for the obvious reason.
+        media_ = std::make_unique<tsgui::MediaControls>(model_, *settings_, Hwnd());
 
         RestoreRom();
         RebuildRecentMenu();
@@ -240,6 +250,20 @@ namespace winrt::WindowsTSPlayer::implementation
 
         if (name == L"SongName" || name == L"RomName") {
             SyncHeading();
+        }
+
+        // The shell is told on the properties that describe a *state*, and never on Position -- which
+        // arrives ten times a second and is the one thing SMTC works out for itself from the last
+        // timeline it was given. MediaControls::Sync compares before it publishes, so calling it on
+        // three properties rather than one costs nothing and cannot miss a change to the third.
+        //
+        // The seek is the exception that has to get through, and it does so without being named here:
+        // Sync spots a position that has moved further than a tick could account for and re-bases the
+        // timeline on that. Naming it here instead would need every caller of Seek to remember to say
+        // so, and there are five of them.
+        if (media_ && (name == L"SongName" || name == L"Playing" || name == L"Looping"
+                       || name == L"Duration" || name == L"Position")) {
+            media_->Sync();
         }
 
         if (name == L"Position") {

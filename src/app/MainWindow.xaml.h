@@ -2,6 +2,7 @@
 
 #include "MainWindow.g.h"
 
+#include "MediaControls.h"
 #include "SettingsStore.h"
 
 #include <memory>
@@ -87,6 +88,11 @@ namespace winrt::WindowsTSPlayer::implementation
         HWND Hwnd();
 
         std::unique_ptr<tsgui::SettingsStore> settings_;
+
+        /// The shell's media controls. Built after the window has an HWND, because that is what
+        /// GetForWindow needs, and torn down before the model so the now-playing entry does not
+        /// outlive the thing it names.
+        std::unique_ptr<tsgui::MediaControls> media_;
         WindowsTSPlayer::PlayerModel model_{ nullptr };
 
         /// A song named before there was a ROM to play it on. Empty the rest of the time.
