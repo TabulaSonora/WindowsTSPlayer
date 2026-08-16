@@ -68,6 +68,13 @@
                 </DropDownButton.Flyout>
             </DropDownButton>
 
+            <!--
+                Song information, in a window of its own rather than a flyout or a dialog. What a
+                file says about itself runs to three pages, and reading the credits of a piece while
+                it plays is the case it exists for - which a modal dialog would make impossible.
+            -->
+            <Button x:Name="SongInfoButton" Content="Song info..." IsEnabled="False" Click="OnSongInfoClick" />
+
             <Button x:Name="ExportButton" Content="Export WAV..." IsEnabled="False" Click="OnExportClick" />
             <Button x:Name="PrefsButton" Content="Preferences..." Click="OnPrefsClick" />
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis" Text="No ROM loaded." />

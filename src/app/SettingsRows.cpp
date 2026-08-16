@@ -18,6 +18,19 @@ Brush ThemeBrush(const wchar_t* key)
 
 namespace tsgui
 {
+    FrameworkElement MakeCard(UIElement const& content)
+    {
+        Border card;
+        card.Background(ThemeBrush(L"CardBackgroundFillColorDefaultBrush"));
+        card.BorderBrush(ThemeBrush(L"CardStrokeColorDefaultBrush"));
+        card.BorderThickness(ThicknessHelper::FromUniformLength(1));
+        card.CornerRadius(CornerRadiusHelper::FromUniformRadius(kRowCornerRadius));
+        card.Padding(ThicknessHelper::FromLengths(kRowPaddingX, kRowPaddingY,
+                                                  kRowPaddingX, kRowPaddingY));
+        card.Child(content);
+        return card;
+    }
+
     FrameworkElement MakeSettingsRow(std::wstring_view title,
                                      std::wstring_view description,
                                      UIElement const& control)
@@ -41,7 +54,6 @@ namespace tsgui
         }
 
         Grid grid;
-        grid.Padding(ThicknessHelper::FromLengths(14, 10, 14, 10));
         grid.ColumnSpacing(16);
 
         ColumnDefinition stretch;
@@ -66,13 +78,7 @@ namespace tsgui
             grid.Children().Append(control);
         }
 
-        Border card;
-        card.Background(ThemeBrush(L"CardBackgroundFillColorDefaultBrush"));
-        card.BorderBrush(ThemeBrush(L"CardStrokeColorDefaultBrush"));
-        card.BorderThickness(ThicknessHelper::FromUniformLength(1));
-        card.CornerRadius(CornerRadiusHelper::FromUniformRadius(4));
-        card.Child(grid);
-        return card;
+        return MakeCard(grid);
     }
 
     FrameworkElement MakeSettingsGroup(std::wstring_view title,

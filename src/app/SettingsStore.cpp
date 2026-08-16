@@ -33,6 +33,26 @@ constexpr int default_window_width = 700;
 constexpr int default_window_height = 830;
 constexpr bool default_window_maximized = false;
 
+/// The song information window's first-run size.
+///
+/// Half of a real window, sized by hand until the song page fitted without scrolling. The proportions
+/// are that window's and are the point of measuring one -- far taller than wide, because every page
+/// here is a single column -- but the size is not, because it was measured on a 4K display and 1805px
+/// of height is more than the whole work area of a 1080p one.
+///
+/// Halving is what keeps that from mattering. The clamp in RestoreWindowGeometry would catch it, but
+/// what the clamp produces is a window filling the screen top to bottom on first run, which is a
+/// worse first impression than a smaller one -- and it would hide that the default was wrong, because
+/// the result looks deliberate.
+///
+/// These are physical pixels, like the two above, which is what AppWindow::Resize takes. On a display
+/// scaled past 100% they therefore describe a smaller window than they do here; the honest fix is to
+/// scale the default by the window's DPI, and it is not worth a sentinel value in this store for a
+/// number that only decides where a fresh profile starts.
+constexpr int default_song_info_width = 688;
+constexpr int default_song_info_height = 902;
+constexpr bool default_song_info_maximized = false;
+
 ApplicationDataContainer Values()
 {
     return ApplicationData::Current().LocalSettings();
@@ -77,6 +97,9 @@ namespace tsgui
         , windowWidth_(ReadInt(L"window-width", default_window_width))
         , windowHeight_(ReadInt(L"window-height", default_window_height))
         , windowMaximized_(ReadBool(L"window-maximized", default_window_maximized))
+        , songInfoWidth_(ReadInt(L"song-info-width", default_song_info_width))
+        , songInfoHeight_(ReadInt(L"song-info-height", default_song_info_height))
+        , songInfoMaximized_(ReadBool(L"song-info-maximized", default_song_info_maximized))
     {
         // Clamped on the way in, not only on the way out. GSettings enforces a <range> on several of
         // these and LocalSettings enforces nothing at all, so a value that has been corrupted -- or
@@ -85,6 +108,8 @@ namespace tsgui
         outputGain_ = std::clamp(outputGain_, 0.0, 2.0);
         windowWidth_ = std::clamp(windowWidth_, 360, 8192);
         windowHeight_ = std::clamp(windowHeight_, 360, 8192);
+        songInfoWidth_ = std::clamp(songInfoWidth_, 360, 8192);
+        songInfoHeight_ = std::clamp(songInfoHeight_, 360, 8192);
     }
 
     void SettingsStore::write(const std::string& key, int value)
@@ -216,6 +241,21 @@ namespace tsgui
         values.Insert(L"window-width", box_value(static_cast<int32_t>(windowWidth_)));
         values.Insert(L"window-height", box_value(static_cast<int32_t>(windowHeight_)));
         values.Insert(L"window-maximized", box_value(windowMaximized_));
+    }
+
+    void SettingsStore::set_song_info_geometry(int width, int height, bool maximized)
+    {
+        // Written the same way as the player's, and for the same reason it raises no change: geometry
+        // means nothing to the engine, and a resize that walked the changed handler would rebuild the
+        // generator -- which is audible.
+        songInfoWidth_ = std::clamp(width, 360, 8192);
+        songInfoHeight_ = std::clamp(height, 360, 8192);
+        songInfoMaximized_ = maximized;
+
+        auto values = Values().Values();
+        values.Insert(L"song-info-width", box_value(static_cast<int32_t>(songInfoWidth_)));
+        values.Insert(L"song-info-height", box_value(static_cast<int32_t>(songInfoHeight_)));
+        values.Insert(L"song-info-maximized", box_value(songInfoMaximized_));
     }
 
     TSEngineSettings SettingsStore::engine_settings() const

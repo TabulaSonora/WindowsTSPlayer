@@ -17,6 +17,18 @@ namespace tsgui
     /// preferences are assembled in code rather than in markup for the same reason -- fifteen rows
     /// that differ only in their control read better as a loop than as fifteen blocks of XAML.
 
+    /// The metrics every row in this program shares, exported because two files build rows on them:
+    /// the preferences below, and the song information window, whose rows differ enough in content --
+    /// a selectable value, a paragraph of the file's own prose, a marker that can be clicked -- that
+    /// they cannot go through MakeSettingsRow, but must still line up beside each other.
+    inline constexpr double kRowCornerRadius = 4.0;
+    inline constexpr double kRowPaddingX = 14.0;
+    inline constexpr double kRowPaddingY = 10.0;
+
+    /// The surface a row is drawn on: bordered, rounded and padded, in the theme's own card colours.
+    winrt::Microsoft::UI::Xaml::FrameworkElement MakeCard(
+        winrt::Microsoft::UI::Xaml::UIElement const& content);
+
     /// One row: a title, an optional sentence under it, and a control on the right.
     ///
     /// An empty description collapses rather than reserving its line, because most rows do not need

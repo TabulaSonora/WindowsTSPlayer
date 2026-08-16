@@ -548,6 +548,22 @@ void test_encoding()
         const SongInfo info = read(file(1, {track(meta(0x02, "Copyright \xa9 1995"))}));
         check_equal(info.encoding, TextEncoding::cp1252, "high bytes that are not UTF-8 or CJK");
     }
+    {
+        // The same kana with one byte damaged. 0xFF is a lead in no Shift-JIS reading, and a file
+        // that carries one is still overwhelmingly a Japanese file -- Haru-no-umi.mid is a real one,
+        // with thirty-nine sound pairs and six bad bytes. Detection used to be unanimous-or-nothing
+        // and sent the whole file to cp1252 on the strength of the six, turning every track name in
+        // it into mojibake.
+        const SongInfo info = read(file(1, {track(meta(0x03, "\x83\x5c\x83\x93\x83\x4f\xff"))}));
+        check_equal(info.encoding, TextEncoding::shift_jis, "Shift-JIS survives a damaged byte");
+    }
+    {
+        // And the other side of that line, which is what stops the tolerance becoming a guess: one
+        // kana pair against four bytes that cannot be Shift-JIS leads is what Cyrillic looks like
+        // when a smart quote wanders into the evidence band, and it must still land on the fallback.
+        const SongInfo info = read(file(1, {track(meta(0x03, "\x83\x5c\xf0\xf1\xf2\xf3"))}));
+        check_equal(info.encoding, TextEncoding::cp1252, "one good pair does not outvote four bad");
+    }
 }
 
 // -- Malformed files -------------------------------------------------------------------------------

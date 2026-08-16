@@ -75,6 +75,18 @@ namespace tsgui
         bool window_maximized() const noexcept { return windowMaximized_; }
         void set_window_geometry(int width, int height, bool maximized);
 
+        /// The song information window, which is remembered separately.
+        ///
+        /// Three keys of their own rather than a shared "secondary window" set, because they are a
+        /// different window with a different shape -- one tall narrow column against the player's
+        /// wide one -- and a second window added later would want its own again. These names have no
+        /// counterpart in the GTK build's schema, which does not remember this window at all; they are
+        /// spelled to match `window-*` so that build can adopt them unchanged if it ever does.
+        int song_info_width() const noexcept { return songInfoWidth_; }
+        int song_info_height() const noexcept { return songInfoHeight_; }
+        bool song_info_maximized() const noexcept { return songInfoMaximized_; }
+        void set_song_info_geometry(int width, int height, bool maximized);
+
         /// The whole engine struct at once, so N changed keys cost one rebuild rather than N.
         [[nodiscard]] TSEngineSettings engine_settings() const;
 
@@ -103,5 +115,8 @@ namespace tsgui
         int windowWidth_;
         int windowHeight_;
         bool windowMaximized_;
+        int songInfoWidth_;
+        int songInfoHeight_;
+        bool songInfoMaximized_;
     };
 }

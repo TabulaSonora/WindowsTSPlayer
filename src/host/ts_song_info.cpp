@@ -203,9 +203,25 @@ bool is_utf8(std::span<const std::uint8_t> bytes)
 /// Half-width katakana (0xA1-0xDF, single byte) deliberately proves nothing on its own: it shares
 /// its range with the whole of Latin-1's accented alphabet, and a copyright sign is far commoner in
 /// this corpus than a katakana-only title.
+///
+/// **Evidence is weighed rather than required to be unanimous, and that is a fix rather than a
+/// loosening.** This used to return false at the first byte that did not fit, which meant one
+/// corrupt field condemned an entire file: Haru-no-umi.mid carries thirty-nine sound Japanese pairs
+/// and six bad bytes, and went to cp1252 on the strength of the six -- every one of its track names
+/// rendered as mojibake because one of them had been damaged. That is the same mistake the decoder
+/// downstream is careful not to make. It loses the byte it cannot read and keeps the string; this
+/// should lose the byte and keep the *file*, for the same reason.
+///
+/// The counter-example the old rule was accidentally guarding against still fails, and not by luck.
+/// Cyrillic in CP1251 puts its commonest lowercase letters at 0xF0-0xFF, which is a lead byte in no
+/// Shift-JIS reading at all, so Russian text produces bad bytes in quantity; and it reaches the
+/// 0x81-0x9F evidence band only through the odd smart quote. So the two populations separate on the
+/// ratio even though they overlap on both of its terms, and "more good than bad" is enough of a line
+/// to draw between them without inventing a threshold to tune.
 bool is_shift_jis(std::span<const std::uint8_t> bytes)
 {
-    bool saw_japanese_lead = false;
+    std::size_t japanese = 0;
+    std::size_t invalid = 0;
     std::size_t index = 0;
     while (index < bytes.size()) {
         const std::uint8_t lead = bytes[index];
@@ -216,16 +232,27 @@ bool is_shift_jis(std::span<const std::uint8_t> bytes)
         const bool kana_or_kanji = lead >= 0x81U && lead <= 0x9FU;
         const bool extended = lead >= 0xE0U && lead <= 0xEFU;
         if ((!kana_or_kanji && !extended) || index + 1 >= bytes.size()) {
-            return false;
+            ++invalid;
+            ++index;
+            continue;
         }
         const std::uint8_t trail = bytes[index + 1];
         if (trail < 0x40U || trail > 0xFCU || trail == 0x7FU) {
-            return false;
+            // Resynchronised one byte on rather than two. A bad trail means the pair was never a
+            // pair, so the byte after it is as likely to be a fresh lead as anything else, and
+            // skipping it unread would turn one damaged character into two.
+            ++invalid;
+            ++index;
+            continue;
         }
-        saw_japanese_lead = saw_japanese_lead || kana_or_kanji;
+        japanese += kana_or_kanji ? 1U : 0U;
         index += 2;
     }
-    return saw_japanese_lead;
+
+    // Strictly greater, so a file with no Japanese evidence at all cannot pass on 0 > 0 -- which is
+    // what keeps a lone Latin-1 copyright sign, whose byte falls in the half-width katakana range
+    // and is therefore neither good evidence nor bad, out of here.
+    return japanese > invalid;
 }
 
 /// The encoding ladder, run once over everything the file says.
@@ -636,6 +663,26 @@ const char* encoding_name(TextEncoding encoding)
         break;
     }
     return "WINDOWS-1252";
+}
+
+unsigned int encoding_code_page(TextEncoding encoding)
+{
+    switch (encoding) {
+    case TextEncoding::ascii:
+    case TextEncoding::utf8:
+        // 65001, CP_UTF8. ASCII is a subset, so one answer covers both, exactly as encoding_name
+        // above gives both "UTF-8".
+        return 65001;
+    case TextEncoding::shift_jis:
+        // 932, which is Microsoft's Shift-JIS and not quite the standard's: it adds the NEC and IBM
+        // extension rows. That is the right way round for reading files -- a file written on a
+        // Japanese Windows is in 932, and decoding it as strict Shift-JIS would reject the very
+        // characters the extensions were added for.
+        return 932;
+    case TextEncoding::cp1252:
+        break;
+    }
+    return 1252;
 }
 
 SongInfo read_song_info(std::span<const std::uint8_t> data, const std::string& name, int sample_rate)

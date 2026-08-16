@@ -15,6 +15,18 @@ deliberately traceable to both — comments say so where it matters.
 Apple and Linux front ends. Keep every Windows change either purely additive or `#ifdef`-guarded, so
 the three stay diffable and a fix in one can be carried to the others.
 
+Two of them are owed back the other way, and neither is Windows-specific:
+
+- `encoding_code_page` is additive and sits beside `encoding_name`, which the other two pass to
+  iconv. Windows has no iconv and `MultiByteToWideChar` takes a number, so it needed its own answer
+  to the same question.
+- **`is_shift_jis` weighs its evidence instead of demanding unanimity**, and that is a bug fix all
+  three want. It used to return false at the first byte that did not fit, so one damaged field
+  condemned a whole file to cp1252 — `Haru-no-umi.mid` has thirty-nine sound Japanese pairs and six
+  bad bytes, and every track name in it rendered as mojibake on the strength of the six. It is the
+  only non-additive change to this directory; the body changed and the signature did not, so it
+  still diffs cleanly.
+
 ## Prerequisites that are not optional
 
 - `git submodule update --init --recursive` (or `-DTSGUI_NATIVETS_DIR=…`, or a sibling
@@ -25,6 +37,13 @@ the three stay diffable and a fix in one can be carried to the others.
 - Visual Studio **Build Tools 2026** with `Microsoft.VisualStudio.ComponentGroup.WindowsAppDevelopment.VC.BuildTools`
   — note that is the VS2026 spelling; the VS2022 name was `…ComponentGroup.WindowsAppSDK.Cpp`. The
   Build Tools carry CMake, Ninja and NuGet restore, so none of those needs a separate install.
+- **Registering a Debug build needs both Debug VCLibs frameworks installed**, which the Build Tools do
+  not install and Windows garbage-collects once nothing references them. Without them
+  `Add-AppxPackage -Register` fails with `0x80073CFB` naming the framework it wants and nothing about
+  where to find it — they ship in the SDK, at
+  `…\Windows Kits\10\ExtensionSDKs\Microsoft.VCLibs{,.Desktop}\14.0\Appx\Debug\x64\`, and both are
+  needed: `Microsoft.VCLibs.140.00.Debug` and `…Debug.UWPDesktop`. Release uses the retail pair, which
+  is already present on any machine that has run a Store app.
 
 ## Nothing Roland-derived is committed
 
@@ -116,6 +135,19 @@ opposite case and must be declared.
 `export-matches-cli` is the load-bearing one, unchanged in intent from the Linux build: it renders
 through the export path and byte-compares the WAV against `tabula-sonora render` built from the same
 engine tree, so it asks only whether this program renders the engine faithfully.
+
+**`TS_SCCORE_DLL` in the environment does nothing once the tree has been configured without it**, and
+a run that skips two thirds of the suite still says `100% tests passed`. `TSGUI_TEST_ROM` is a
+`CACHE` variable, so the environment seeds it exactly once and every later configure reuses the empty
+value that was cached first. Pass it, and the MIDI file the render tests need, on the configure line:
+
+```powershell
+cmake --preset dev "-DTSGUI_TEST_ROM=<SCCore.dll>" "-DTSGUI_TEST_MIDI=<a .mid>"
+```
+
+A correct run is **three** tests. One is `song-info` alone, which means the other two were never
+registered — that is the signal to check, because ctest reports nothing amiss about tests that do not
+exist.
 
 **There is no ThreadSanitizer on Windows.** MSVC has none and clang-cl does not support
 `-fsanitize=thread`. `host-smoke` still drives the ring across two threads but no longer *detects*

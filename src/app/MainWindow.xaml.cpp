@@ -8,7 +8,9 @@
 #include "MixerView.xaml.h"
 #include "PlayerModel.h"
 #include "PrefsDialog.h"
+#include "SongInfoWindow.h"
 #include "TransportView.xaml.h"
+#include "WindowChrome.h"
 
 // IWindowNative, which is how a WinUI 3 desktop window surrenders its HWND. There is no projected
 // way to ask: the window is a XAML object and the HWND is an implementation detail everywhere except
@@ -81,8 +83,13 @@ namespace winrt::WindowsTSPlayer::implementation
         // and the process dies with an access violation before the window is ever shown. It is
         // idempotent, so calling it here costs nothing if the framework has already been through it.
         InitializeComponent();
-        SetWindowIcon();
-        SetUpBackdrop();
+
+        // Shared with the song information window, so the two wear the same chrome. A second window
+        // with a system-drawn caption beside a first with a drawn one does not read as one program.
+        const auto window = try_as<Window>();
+        tsgui::SetWindowIcon(window);
+        tsgui::SetUpWindowChrome(window, TitleBarArea());
+
         RestoreWindowGeometry();
 
         Transport().Model(model_);
@@ -106,6 +113,14 @@ namespace winrt::WindowsTSPlayer::implementation
 
         Closed([this](IInspectable const&, WindowEventArgs const&) {
             SaveWindowGeometry();
+
+            // Before the model goes, not after. The information window subscribes to the model and
+            // holds it strongly through every marker row, so a copy left open would keep the engine
+            // and its render thread alive with nothing left to publish into.
+            if (songInfoWindow_ != nullptr) {
+                songInfoWindow_.Close();
+                songInfoWindow_ = nullptr;
+            }
 
             // Dropping the last reference stops the tick and the device: the model's destructor owns
             // that teardown, and leaving it to process exit would let the render thread and the
@@ -155,48 +170,41 @@ namespace winrt::WindowsTSPlayer::implementation
         co_await tsgui::ShowPreferencesAsync(*settings_, Content().XamlRoot());
     }
 
+    void MainWindow::OnSongInfoClick(IInspectable const&, RoutedEventArgs const&)
+    {
+        // Brought forward rather than opened again. The window follows the player across one file
+        // and the next, so a second click means "where did that go", not "give me another one".
+        if (songInfoWindow_ != nullptr) {
+            songInfoWindow_.Activate();
+            return;
+        }
+
+        songInfoWindow_ = tsgui::CreateSongInfoWindow(model_, *settings_);
+
+        // Cleared when it closes, so the next click builds a fresh one. Without this the handle
+        // would outlive the window it names and Activate would be called on a closed window - which
+        // does not throw, and so would look like the button having stopped working.
+        songInfoWindow_.Closed([this](auto&&, auto&&) { songInfoWindow_ = nullptr; });
+
+        songInfoWindow_.Activate();
+    }
+
     // -- Window -------------------------------------------------------------------------------------
 
+    // Both halves live in WindowChrome, because the song information window remembers its own size
+    // the same way and the two traps they step around -- Resize not clamping, and a maximized
+    // window's size not being the one to store -- should not be written down twice.
     void MainWindow::RestoreWindowGeometry()
     {
-        auto window = AppWindow();
-
-        // Clamped against the work area, which AppWindow::Resize will not do for us. GTK clamped a
-        // default size to the monitor and that is where the stored 830px height came from; restoring
-        // it unchecked onto a shorter screen would put the transport off the bottom edge.
-        const auto display = Microsoft::UI::Windowing::DisplayArea::GetFromWindowId(
-            window.Id(), Microsoft::UI::Windowing::DisplayAreaFallback::Primary);
-        const auto work = display.WorkArea();
-
-        const int32_t width = std::min<int32_t>(settings_->window_width(), work.Width);
-        const int32_t height = std::min<int32_t>(settings_->window_height(), work.Height);
-        window.Resize({ width, height });
-
-        if (settings_->window_maximized()) {
-            if (auto presenter = window.Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>()) {
-                presenter.Maximize();
-            }
-        }
+        tsgui::RestoreWindowGeometry(try_as<Window>(), settings_->window_width(),
+                                     settings_->window_height(), settings_->window_maximized());
     }
 
     void MainWindow::SaveWindowGeometry()
     {
-        auto window = AppWindow();
-        auto presenter = window.Presenter().try_as<Microsoft::UI::Windowing::OverlappedPresenter>();
-        const bool maximized =
-            presenter != nullptr
-            && presenter.State() == Microsoft::UI::Windowing::OverlappedPresenterState::Maximized;
-
-        // The size is only worth storing when the window is showing it. A maximized window's size is
-        // the screen's, and restoring that as a restored-down size would leave it filling the display
-        // with a title bar that says it is not maximized.
-        if (maximized) {
-            settings_->set_window_geometry(settings_->window_width(), settings_->window_height(), true);
-            return;
-        }
-
-        const auto size = window.Size();
-        settings_->set_window_geometry(size.Width, size.Height, false);
+        const auto geometry = tsgui::MeasureWindowGeometry(
+            try_as<Window>(), settings_->window_width(), settings_->window_height());
+        settings_->set_window_geometry(geometry.width, geometry.height, geometry.maximized);
     }
 
     HWND MainWindow::Hwnd()
@@ -371,6 +379,7 @@ namespace winrt::WindowsTSPlayer::implementation
 
         StatusText().Text(model_.RomName());
         ExportButton().IsEnabled(true);
+        SongInfoButton().IsEnabled(true);
 
         listChanges_ = 0;
         updates_ = 0;
@@ -407,10 +416,8 @@ namespace winrt::WindowsTSPlayer::implementation
         StorageApplicationPermissions::MostRecentlyUsedList().Add(file, file.Path());
     }
 
-    fire_and_forget MainWindow::RebuildRecentMenu()
+    void MainWindow::RebuildRecentMenu()
     {
-        auto lifetime = get_strong();
-
         auto items = RecentFlyout().Items();
         items.Clear();
 
@@ -533,97 +540,5 @@ namespace winrt::WindowsTSPlayer::implementation
 
         ExportButton().IsEnabled(true);
         StatusText().Text(ok ? model_.RomName() : model_.LastError());
-    }
-
-    // -- Chrome -------------------------------------------------------------------------------------
-
-    void MainWindow::SetUpBackdrop()
-    {
-        // Mica Alt as the window's base, with the mixer lifted onto a layer above it.
-        //
-        // The intent is two materials: Mica Alt behind the title bar, the file controls and the
-        // transport, and the lighter Mica behind the mixer. That cannot be had literally. A backdrop
-        // is a property of the *window* - one SystemBackdrop, composited by the system behind
-        // everything - and UIElement does not implement ICompositionSupportsSystemBackdrop, so there
-        // is no way to give a region a material of its own.
-        //
-        // What produces the same reading is the layering Fluent is built around, and Mica Alt is
-        // specifically the kind meant to sit underneath it: the deeper, more strongly tinted base,
-        // with content raised onto translucent layers. So the window takes BaseAlt, the chrome shows
-        // it bare, and the mixer sits on a layer brush that lifts it back towards the weight of plain
-        // Mica. The hierarchy is the one intended; only the mechanism differs.
-        //
-        // Asked for rather than assumed. Mica needs Windows 11 and composition support, and on a
-        // machine without either, MicaBackdrop paints nothing at all: the window would come up with
-        // a transparent body over the desktop, because the root Grid deliberately has no background
-        // of its own. Leaving SystemBackdrop unset in that case gets the solid theme colour, and the
-        // mixer's layer brush still reads correctly over it.
-        if (Microsoft::UI::Composition::SystemBackdrops::MicaController::IsSupported()) {
-            Media::MicaBackdrop backdrop;
-            backdrop.Kind(Microsoft::UI::Composition::SystemBackdrops::MicaKind::BaseAlt);
-            SystemBackdrop(backdrop);
-        }
-
-        // The title bar has to come with it. A system-drawn caption is painted its own opaque colour,
-        // so the material would stop at a hard edge below the top of the window.
-        ExtendsContentIntoTitleBar(true);
-        SetTitleBar(TitleBarArea());
-
-        // The caption buttons are not a fixed width -- they differ with language, with the presence
-        // of a maximise button, and on a machine that shows the Widgets or Snap affordances -- so the
-        // clearance is read back from the window rather than guessed at. Re-read on every change,
-        // because moving the window between displays of different scale changes it.
-        const auto reserve = [this]() {
-            const auto titleBar = AppWindow().TitleBar();
-            const double scale = TitleBarArea().XamlRoot() != nullptr
-                                     ? TitleBarArea().XamlRoot().RasterizationScale()
-                                     : 1.0;
-            TitleBarArea().Padding(
-                ThicknessHelper::FromLengths(titleBar.LeftInset() / scale, 0,
-                                             titleBar.RightInset() / scale, 0));
-        };
-
-        // AppWindow::Changed, not a title-bar event: AppWindowTitleBar has none. The UWP type had
-        // LayoutMetricsChanged and the Windowing one does not, so the insets are re-read whenever the
-        // window itself changes, which covers the resize and the move between displays that would
-        // alter them.
-        AppWindow().Changed([reserve](auto&&, auto&&) { reserve(); });
-        reserve();
-    }
-
-    void MainWindow::SetWindowIcon()
-    {
-        // The taskbar and Start entries come from the manifest's logos, but the title bar, the
-        // Alt-Tab card and the system menu read the HWND's icon, and WinUI 3 sets none from the
-        // package -- so the icon is right everywhere except the window itself until this runs.
-        //
-        // Resolved against the executable's own directory rather than passed as a relative path.
-        // SetIcon resolves a relative path against the process working directory, which is whatever
-        // the shell felt like when it launched us and is not the install folder.
-        //
-        // Grown until it fits rather than assuming MAX_PATH. GetModuleFileNameW reports truncation
-        // by filling the buffer exactly, so one fixed-size call cannot tell success from a silently
-        // cut path.
-        std::wstring module;
-        DWORD length = 0;
-        for (std::size_t size = MAX_PATH; size <= 32768; size *= 2) {
-            module.resize(size);
-            length = GetModuleFileNameW(nullptr, module.data(), static_cast<DWORD>(module.size()));
-            if (length == 0) {
-                return;
-            }
-            if (length < module.size()) {
-                break;
-            }
-        }
-        module.resize(length);
-
-        const auto slash = module.find_last_of(L"/\\");
-        if (slash == std::wstring::npos) {
-            return;
-        }
-
-        const std::wstring icon = module.substr(0, slash + 1) + L"Assets\\AppIcon.ico";
-        AppWindow().SetIcon(icon);
     }
 }

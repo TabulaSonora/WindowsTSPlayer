@@ -210,4 +210,14 @@ struct SongInfo {
 /// "WINDOWS-1252".
 [[nodiscard]] const char* encoding_name(TextEncoding encoding);
 
+/// The same encoding as a Windows code page: 65001, 932 or 1252.
+///
+/// Added beside `encoding_name` rather than replacing it, and that is deliberate. This directory is
+/// shared by copy with the Apple and Linux front ends, both of which pass the name above to iconv;
+/// changing its return type to suit one platform would fork the file. Windows has no iconv, and
+/// `MultiByteToWideChar` takes a number rather than a name, so it needs its own answer to the same
+/// question. Nothing here is platform-specific -- it is a switch over an enum -- so it is left
+/// unguarded and can be carried back to the other two whenever they want it.
+[[nodiscard]] unsigned int encoding_code_page(TextEncoding encoding);
+
 } // namespace ts::host
