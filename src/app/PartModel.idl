@@ -1,0 +1,68 @@
+namespace WindowsTSPlayer
+{
+    // One mixer strip's worth of state.
+    //
+    // There are always sixty-four of these and they are created once, at PlayerModel's construction;
+    // the mixer shows the subset the loaded song addresses. Updating in place rather than rebuilding
+    // the collection is what keeps rows from churning ten times a second, and it is the whole reason
+    // this is a runtimeclass with INotifyPropertyChanged rather than a plain struct handed across.
+    //
+    // No constructor, deliberately: nothing outside PlayerModel has any business making one, and a
+    // strip that is not backed by an engine part would have nothing to show.
+    runtimeclass PartModel : Microsoft.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        /// `port * 16 + channel`, which is how the engine addresses parts and how mute and solo are
+        /// keyed. Fixed for the life of the object.
+        Int32 Index{ get; };
+
+        /// The port this part's slot belongs to, counted from zero. Also fixed.
+        Int32 Port{ get; };
+
+        /// The channel the part *listens on*, counted from zero -- not the slot it occupies.
+        ///
+        /// Parts are matched by receive channel rather than indexed by it, so a strip has to be
+        /// labelled and ordered by this. The two agree until a bulk dump or a `40 1x 02` moves a
+        /// part, and then a mixer built on the slot number is describing something the file is not
+        /// addressing.
+        Int32 Channel{ get; };
+
+        /// "A1" and "Port A, channel 1": the strip only has room for the first, and the second is
+        /// what a screen reader should say.
+        String Label{ get; };
+        String Address{ get; };
+
+        /// The sounding instrument's name -- the tone's, or the kit's on a drum part.
+        String Name{ get; };
+
+        /// Drum kit and tone map, when either applies.
+        String Tags{ get; };
+
+        /// The numbers behind the name: program and both halves of the bank select.
+        String Detail{ get; };
+
+        Int32 Voices{ get; };
+
+        /// CC#7, CC#10 and CC#11 as the engine holds them right now, 0..127.
+        ///
+        /// These are the part's own controllers rather than anything this program keeps: a strip
+        /// showing them is reading the same registers the file writes. Expression has no fader
+        /// because nothing in the interface should invite writing it -- it is here so a volume
+        /// readout can say what else is scaling the part.
+        Int32 Volume{ get; };
+        Int32 Pan{ get; };
+        Int32 Expression{ get; };
+
+        Boolean Muted{ get; };
+        Boolean Soloed{ get; };
+
+        /// Whether the loaded song addresses this part at all. The mixer shows these and hides the
+        /// rest.
+        Boolean Present{ get; };
+
+        Boolean Drums{ get; };
+
+        /// Not the part's own state: it means something *else* is soloed, which the mixer knows and
+        /// a single part does not.
+        Boolean Dimmed{ get; };
+    }
+}

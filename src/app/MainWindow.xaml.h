@@ -2,26 +2,13 @@
 
 #include "MainWindow.g.h"
 
-#include <memory>
-
-// Forward-declared rather than included.
-//
-// The host layer's headers drag in the engine's, and the engine's are compiled by the CMake half
-// with its own flags. Keeping them out of a header the XAML compiler also generates against means
-// the generated code, the projection and the engine never have to agree on warning levels or on
-// what windows.h has already defined. The cost is a destructor that has to be declared here and
-// defined in the .cpp, where both types are complete.
-namespace ts::host {
-class Player;
-class AudioDevice;
-}
-
 namespace winrt::WindowsTSPlayer::implementation
 {
     struct MainWindow : MainWindowT<MainWindow>
     {
         MainWindow();
-        ~MainWindow();
+
+        WindowsTSPlayer::PlayerModel Model() const { return model_; }
 
         winrt::fire_and_forget OnOpenRomClick(
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
@@ -29,15 +16,31 @@ namespace winrt::WindowsTSPlayer::implementation
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
         void OnPlayPauseClick(
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+        void OnRestartClick(
+            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+        void OnPanicClick(
+            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
+        void OnLoopClick(
+            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
 
     private:
-        void Tick();
+        void OnModelPropertyChanged(
+            IInspectable const& sender,
+            Microsoft::UI::Xaml::Data::PropertyChangedEventArgs const& args);
+        void UpdateReadouts();
+
         HWND Hwnd();
 
-        std::unique_ptr<ts::host::Player> player_;
-        std::unique_ptr<ts::host::AudioDevice> device_;
+        WindowsTSPlayer::PlayerModel model_{ nullptr };
 
-        Microsoft::UI::Dispatching::DispatcherQueueTimer timer_{ nullptr };
+        /// How many times the visible list has been altered, and how many model updates have
+        /// arrived.
+        ///
+        /// This exists to make the milestone's claim checkable rather than assertable: play a
+        /// sixteen-part file and the first number must settle and stay put while the second climbs.
+        /// A development readout; it goes when the real mixer arrives.
+        uint64_t listChanges_{ 0 };
+        uint64_t updates_{ 0 };
     };
 }
 

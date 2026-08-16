@@ -214,6 +214,8 @@
     <ClCompile Include="MainWindow.xaml.cpp">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="PartModel.cpp" />
+    <ClCompile Include="PlayerModel.cpp" />
 
     <!--
       cppwinrt generates module.g.cpp and then leaves it to the project to compile: its targets add
@@ -241,11 +243,16 @@
     <ClInclude Include="MainWindow.xaml.h">
       <DependentUpon>MainWindow.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="PartModel.h" />
+    <ClInclude Include="PlayerModel.h" />
+    <ClInclude Include="ToneMap.h" />
   </ItemGroup>
 
   <ItemGroup>
     <Midl Include="App.idl" />
     <Midl Include="MainWindow.idl" />
+    <Midl Include="PartModel.idl" />
+    <Midl Include="PlayerModel.idl" />
   </ItemGroup>
 
   <ItemGroup>

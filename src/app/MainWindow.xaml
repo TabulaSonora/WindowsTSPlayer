@@ -10,47 +10,66 @@
     Title="Tabula Sonora Player">
 
     <!--
-        Deliberately unlovely. This milestone exists to prove the seam, not to look like anything:
-        that this project links tsgui_host and tabulasonora, that XAML and cppwinrt compile against
-        headers CMake generated the paths for, that a picked path survives into std::ifstream under
-        package identity, and that sound comes out. The real interface arrives later.
+        Still deliberately unlovely. This milestone is the model, not the interface: the strip layout,
+        the height budget that fits sixteen parts on screen, the faders and their echo latch all
+        arrive later. What has to be right here is that the rows are built once and updated in place,
+        which is a thing you watch rather than read.
     -->
-    <ScrollViewer>
-        <StackPanel Padding="24" Spacing="12">
-            <TextBlock Text="M3: the CMake / MSBuild seam"
-                       Style="{StaticResource TitleTextBlockStyle}" />
+    <Grid Padding="16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <TextBlock TextWrapping="Wrap" Opacity="0.7"
-                       Text="Load a licensed SCCore.dll, then a song. If the voice counter moves and you hear the module, the seam holds." />
-
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="OpenRomButton"
-                        Content="Open SCCore.dll..."
-                        Click="OnOpenRomClick" />
-                <Button x:Name="OpenSongButton"
-                        Content="Open song..."
-                        IsEnabled="False"
-                        Click="OnOpenSongClick" />
-                <Button x:Name="PlayPauseButton"
-                        Content="Pause"
-                        IsEnabled="False"
-                        Click="OnPlayPauseClick" />
-            </StackPanel>
-
-            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="No ROM loaded." />
-
-            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="4"
-                    Padding="12">
-                <TextBlock x:Name="EngineText"
-                           FontFamily="Consolas"
-                           TextWrapping="Wrap"
-                           Text="engine idle" />
-            </Border>
-
-            <TextBlock x:Name="BackendText" Opacity="0.6" Text="" />
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+            <Button x:Name="OpenRomButton" Content="Open SCCore.dll..." Click="OnOpenRomClick" />
+            <Button x:Name="OpenSongButton" Content="Open song..." IsEnabled="False" Click="OnOpenSongClick" />
+            <Button x:Name="PlayPauseButton" Content="Pause" IsEnabled="False" Click="OnPlayPauseClick" />
+            <Button x:Name="RestartButton" Content="Restart" IsEnabled="False" Click="OnRestartClick" />
+            <Button x:Name="PanicButton" Content="Panic" IsEnabled="False" Click="OnPanicClick" />
+            <ToggleButton x:Name="LoopButton" Content="Loop" IsEnabled="False" Click="OnLoopClick" />
         </StackPanel>
-    </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Spacing="4">
+            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="No ROM loaded." />
+            <TextBlock x:Name="EngineText" FontFamily="Consolas" Text="engine idle" />
+            <TextBlock x:Name="ChurnText" FontFamily="Consolas" Opacity="0.6" Text="" />
+        </StackPanel>
+
+        <!--
+            SelectionMode None because a mixer strip is not a selectable thing; the row is a set of
+            readouts and, later, controls. IsItemClickEnabled stays off for the same reason.
+        -->
+        <ListView Grid.Row="2"
+                  x:Name="PartList"
+                  SelectionMode="None"
+                  ItemsSource="{x:Bind Model.VisibleParts, Mode=OneWay}">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:PartModel">
+                    <!-- Dimmed is bound but not yet rendered: showing "something else is soloed"
+                         is a mixer-styling question and arrives with the strip layout. -->
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44" />
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="52" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   FontFamily="Consolas"
+                                   Text="{x:Bind Label, Mode=OneWay}"
+                                   ToolTipService.ToolTip="{x:Bind Address, Mode=OneWay}" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" FontFamily="Consolas" Text="{x:Bind Voices, Mode=OneWay}" />
+                        <TextBlock Grid.Column="3"
+                                   Opacity="0.6"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{x:Bind Detail, Mode=OneWay}" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
 </Window>

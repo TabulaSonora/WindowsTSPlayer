@@ -1,8 +1,14 @@
+import "PlayerModel.idl";
+
 namespace WindowsTSPlayer
 {
     [default_interface]
     runtimeclass MainWindow : Microsoft.UI.Xaml.Window
     {
         MainWindow();
+
+        /// Projected so the XAML can x:Bind to it. Compiled bindings resolve against the page's own
+        /// type, so a model reachable only from the implementation class would be invisible to them.
+        PlayerModel Model{ get; };
     }
 }

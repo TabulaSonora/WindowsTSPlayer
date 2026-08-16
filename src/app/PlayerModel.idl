@@ -1,0 +1,83 @@
+import "PartModel.idl";
+
+namespace WindowsTSPlayer
+{
+    // Everything the interface knows about the engine.
+    //
+    // The counterpart of the Apple front end's observable `Player` and of the GTK build's
+    // TsPlayerModel, and it works the same way: the render thread republishes a snapshot about fifty
+    // times a second, and this polls it ten times a second and turns what changed into
+    // PropertyChanged. Polling rather than pushing is deliberate -- it keeps every engine read on
+    // one thread and off the audio path, and a display has no use for more than ten updates a second
+    // anyway.
+    //
+    // Nothing else in the interface touches ts::host::Player.
+    runtimeclass PlayerModel : Microsoft.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        PlayerModel();
+
+        String RomName{ get; };
+        String SongName{ get; };
+
+        Boolean Playing{ get; };
+        Boolean Looping{ get; set; };
+        Boolean Complete{ get; };
+        Boolean XgMode{ get; };
+
+        Double Position{ get; };
+        Double Duration{ get; };
+
+        Int32 ActiveVoices{ get; };
+        Int32 VoiceCapacity{ get; };
+        Int64 Underruns{ get; };
+
+        /// What the last failed call said. Async loads report success as a Boolean and leave the
+        /// message here rather than throwing across the ABI, where a std::exception's text would be
+        /// lost and an hresult_error would carry a number nobody can act on.
+        String LastError{ get; };
+
+        /// Every part the engine has, sixty-four of them, created once and never replaced.
+        Windows.Foundation.Collections.IVectorView<PartModel> AllParts{ get; };
+
+        /// The parts the song actually addresses, in the order a mixer should list them.
+        ///
+        /// Maintained by a minimal insert/remove diff against the desired order, not rebuilt. WinUI
+        /// has no equivalent of GtkFilterListModel and GtkSortListModel, so the filtering and
+        /// sorting the GTK build gets from the toolkit is done here; what it must *not* cost is the
+        /// row churn those two were arranged to avoid.
+        Windows.Foundation.Collections.IObservableVector<PartModel> VisibleParts{ get; };
+
+        /// Which parts the song addresses has changed. Fired only when the set actually differs.
+        event Windows.Foundation.EventHandler<Object> PresenceChanged;
+
+        /// A part has moved to a different receive channel, which changes the order without changing
+        /// the set. Asked separately from presence because a bulk dump does exactly that.
+        event Windows.Foundation.EventHandler<Object> RoutingChanged;
+
+        Windows.Foundation.IAsyncOperation<Boolean> LoadRomAsync(String path, Boolean verifyFully);
+        Windows.Foundation.IAsyncOperation<Boolean> LoadSongAsync(String path);
+        void UnloadSong();
+
+        void Play();
+        void Pause();
+        void TogglePlaying();
+        void Seek(Double seconds);
+
+        /// Back to where the song starts -- its first note, not sample zero.
+        ///
+        /// The distinction exists because a song is armed past its silent lead-in, so "the
+        /// beginning" as the transport has ever shown it is not zero. Restarting is what a finished
+        /// song does on Play; dragging the slider to the far left is still a plain seek to zero, and
+        /// still plays the lead-in.
+        void Restart();
+        void Panic();
+
+        void SetMuted(Int32 part, Boolean muted);
+        void SetSoloed(Int32 part, Boolean soloed);
+        void ResetChannels();
+
+        /// The output backend and the rate the hardware is actually running at, which is not the
+        /// engine's. For the about box and for bug reports.
+        String BackendDescription{ get; };
+    }
+}
