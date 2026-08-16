@@ -45,12 +45,30 @@
         "CMAKE_EXE_LINKER_FLAGS": "/INCREMENTAL:NO",
         "TSGUI_FAST_DEBUG": "OFF"
       }
+    },
+    {
+      "name": "ci",
+      "displayName": "CI",
+      "description": "Ninja rather than a Visual Studio generator, so no year is baked in",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     }
   ],
   "buildPresets": [
     { "name": "dev", "configurePreset": "dev", "configuration": "Debug" },
     { "name": "release", "configurePreset": "release", "configuration": "RelWithDebInfo" },
-    { "name": "asan", "configurePreset": "asan", "configuration": "Debug" }
+    { "name": "asan", "configurePreset": "asan", "configuration": "Debug" },
+    { "name": "ci", "configurePreset": "ci" }
   ],
   "testPresets": [
     {
@@ -63,6 +81,11 @@
       "name": "release",
       "configurePreset": "release",
       "configuration": "RelWithDebInfo",
+      "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "ci",
+      "configurePreset": "ci",
       "output": { "outputOnFailure": true }
     }
   ]

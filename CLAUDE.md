@@ -182,6 +182,31 @@ The engine's own suite needs `tables/` and `fixtures/modulation.json` generated 
 it skips — see README. The modulation fixture feeds the differential oracle for the fixed-point
 control path, which is the single most valuable test on this platform.
 
+## CI, and why it builds differently from you
+
+`.github/workflows/build.yml`, on `windows-latest`, in two jobs. The first builds the engine, the
+host layer and the tests; the second builds the application. They are separate because they fail for
+different reasons — the first going red means the code is wrong, the second means the runner needs
+different arguments.
+
+Two things are pinned to a Visual Studio no runner has, and both had to become overridable rather
+than assumed:
+
+- **The generator.** `dev` and `release` name `Visual Studio 18 2026`. The `ci` preset uses Ninja
+  instead, which takes whichever `cl.exe` is on `PATH`.
+- **The toolset.** `PlatformToolset` is now a conditional default of `v145` rather than a fixed
+  value, so CI can pass `v143`. Note what that actually needs: building with `-p:PlatformToolset=v143`
+  on a machine that has the v143 *compiler* still fails with `MSB8020`, "the build tools for 'v143'
+  application Type UWP cannot be found". `ApplicationType=Windows Store` pulls in the UWP build tools
+  for the chosen toolset, not merely the compiler.
+
+`vcpkg.json` carries a `builtin-baseline`. Without one, a vcpkg instance that is not a git clone —
+the copy bundled with Visual Studio, and whatever a runner has — refuses to resolve ports at all:
+`this vcpkg instance requires a manifest with a specified baseline`.
+
+CI runs **one** test, `song-info`, and the workflow asserts that name is present rather than reading
+the pass count, for the reason in the Testing section above.
+
 ## Conventions
 
 Comments here explain *why*, in full prose, and are dense — non-obvious decisions carry a paragraph

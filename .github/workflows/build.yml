@@ -1,0 +1,145 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Two jobs rather than one, because they fail for different reasons and the first is the one whose
+# red means something is actually wrong with the code.
+#
+# Neither runs the tests that matter most. `export-matches-cli` and `host-smoke` need a licensed
+# SCCore.dll, which is 24 MB of Roland's wave ROM and is never going anywhere near a public runner,
+# so what CI can assert is that the code compiles and that `song-info` passes -- the whole metadata
+# reader, over files the test assembles byte by byte, with nothing to install and nothing to license.
+# That is a real check and it is not the whole check; see README.md for what has to be run by hand.
+
+jobs:
+  engine-and-host:
+    name: Engine, host layer and tests
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The engine is a submodule and the build is meaningless without it. Not `recursive` for
+          # show: NativeTS has submodules of its own.
+          submodules: recursive
+
+      # vcvars by hand rather than a third-party action. Everything else this repository depends on
+      # is pinned to an exact version with a committed lock file, and a marketplace action that
+      # resolves a tag at run time would be the one moving part in that. Only the four variables that
+      # matter are exported, rather than the whole of `set`, so nothing unrelated to the compiler is
+      # overwritten on the way through.
+      - name: Set up MSVC
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          if (-not $vs) { throw 'no Visual Studio installation found on this runner' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+          cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
+            if ($_ -match '^(PATH|INCLUDE|LIB|LIBPATH)=(.*)$') {
+              "$($matches[1])=$($matches[2])" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+            }
+          }
+
+      # The `ci` preset uses Ninja rather than a Visual Studio generator. The `dev` and `release`
+      # presets name "Visual Studio 18 2026", which is correct on the machine this is written on and
+      # exists on no runner; Ninja takes whichever cl.exe the step above put on PATH and so has no
+      # year baked into it.
+      - name: Configure
+        env:
+          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
+        run: cmake --preset ci
+
+      - name: Build
+        run: cmake --build --preset ci
+
+      # One test, and that is the expected number here rather than a disappointment. The other two
+      # are registered only when TSGUI_TEST_ROM names a real SCCore.dll at configure time, so on a
+      # runner they do not exist -- which is why this asserts the count rather than trusting a bare
+      # "100% tests passed", a sentence ctest prints just as happily when nothing was registered.
+      - name: Test
+        run: |
+          ctest --preset ci
+          $names = (ctest --preset ci --show-only=json-v1 | ConvertFrom-Json).tests.name
+          Write-Host "registered: $($names -join ', ')"
+          if ($names -notcontains 'song-info') { throw 'song-info was not registered' }
+
+  application:
+    name: WinUI 3 application
+    runs-on: windows-latest
+
+    # Kept separate from the job above, and this is the reason. What breaks here is the toolchain
+    # rather than the code: the XAML targets, the cppwinrt and MIDL passes and the MSIX packaging all
+    # come from a Visual Studio workload, and a runner's is neither the version nor the vintage this
+    # is developed against. A failure here means the runner needs different arguments; a failure
+    # above means something is wrong with the program.
+    #
+    # The dependency is sharper than "a recent Visual Studio", and it was worth finding out by hand
+    # rather than by three red runs. Building with -p:PlatformToolset=v143 on the development machine
+    # fails with MSB8020 -- "the build tools for 'v143' application Type UWP cannot be found" --
+    # even though that toolset's compiler is installed. ApplicationType is `Windows Store`, which this
+    # project needs and cannot drop (see the comment on it in the .vcxproj), and that pulls in the
+    # Universal Windows Platform build tools *for the chosen toolset* rather than the compiler alone.
+    # So what this job actually requires from a runner image is the UWP C++ component matching
+    # whatever PlatformToolset it is given.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # vcvars by hand rather than a third-party action. Everything else this repository depends on
+      # is pinned to an exact version with a committed lock file, and a marketplace action that
+      # resolves a tag at run time would be the one moving part in that. Only the four variables that
+      # matter are exported, rather than the whole of `set`, so nothing unrelated to the compiler is
+      # overwritten on the way through.
+      - name: Set up MSVC
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          if (-not $vs) { throw 'no Visual Studio installation found on this runner' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+          cmd /c "`"$vcvars`" >nul 2>&1 && set" | ForEach-Object {
+            if ($_ -match '^(PATH|INCLUDE|LIB|LIBPATH)=(.*)$') {
+              "$($matches[1])=$($matches[2])" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+            }
+          }
+
+      # The application links what CMake built, through the props file CMake generates. Building it
+      # is not optional here even though this job does not test it: MSBuild reads TsguiHost props for
+      # the include paths and the static libraries, and without them it stops at the first #include.
+      - name: Configure and build the engine
+        env:
+          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
+        run: |
+          cmake --preset release
+          cmake --build --preset release
+
+      - name: Restore
+        run: >
+          msbuild src\app\WindowsTSPlayer.vcxproj -t:Restore
+          -p:Configuration=Release -p:Platform=x64 -p:PlatformToolset=v143
+
+      # PlatformToolset is passed rather than left to the project, which defaults to the v145 of
+      # Build Tools 2026. Restore needs it too: the C++ project system resolves package .props at
+      # evaluation time, so the two invocations have to agree on which toolset they are evaluating.
+      - name: Build
+        run: >
+          msbuild src\app\WindowsTSPlayer.vcxproj
+          -p:Configuration=Release -p:Platform=x64 -p:PlatformToolset=v143
+
+      # The loose layout, which is what `Add-AppxPackage -Register` takes. Uploaded unsigned and
+      # unregistered: it is here to be looked at, not installed, and it needs a licensed SCCore.dll
+      # imported before it will make a sound.
+      - name: Upload the layout
+        uses: actions/upload-artifact@v4
+        with:
+          name: WindowsTSPlayer-x64-Release
+          path: src/app/x64/Release/WindowsTSPlayer/
+          if-no-files-found: error

@@ -117,7 +117,16 @@
 
   <PropertyGroup Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v145</PlatformToolset>
+
+    <!--
+      v145 is the Build Tools 2026 toolset this is developed against, and it is a default here rather
+      than a fixed value so a machine without it can say so on the command line. A hosted build runner
+      is years behind: none of them has v145, and pinning it outright would mean the application half
+      of this build could never run anywhere but a developer's own machine. Passing
+      -p:PlatformToolset=v143 gets the 2022 toolset instead, which is the oldest that has the C++20
+      this needs and the Windows App SDK targets.
+    -->
+    <PlatformToolset Condition="'$(PlatformToolset)'==''">v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
     <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>

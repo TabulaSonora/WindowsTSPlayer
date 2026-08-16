@@ -5,6 +5,7 @@
   "description": "A WinUI 3 front end for NativeTS, the Roland Sound Canvas VA voice",
   "license": "BSD-3-Clause",
   "supports": "windows & x64",
+  "builtin-baseline": "94a541197763a4f449a1b91478df48c0584a6256",
   "dependencies": [
     "nlohmann-json",
     "cli11"
