@@ -1,0 +1,12 @@
+import "PlayerModel.idl";
+
+namespace WindowsTSPlayer
+{
+    [default_interface]
+    runtimeclass MixerView : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        MixerView();
+
+        PlayerModel Model;
+    }
+}

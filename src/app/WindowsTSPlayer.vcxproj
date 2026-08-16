@@ -228,6 +228,15 @@
     </ClCompile>
     <ClCompile Include="PartModel.cpp" />
     <ClCompile Include="PlayerModel.cpp" />
+    <ClCompile Include="MixerView.xaml.cpp">
+      <DependentUpon>MixerView.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="PartRow.xaml.cpp">
+      <DependentUpon>PartRow.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="VoiceMeter.xaml.cpp">
+      <DependentUpon>VoiceMeter.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="TransportView.xaml.cpp">
       <DependentUpon>TransportView.xaml</DependentUpon>
     </ClCompile>
@@ -260,6 +269,15 @@
     </ClInclude>
     <ClInclude Include="PartModel.h" />
     <ClInclude Include="PlayerModel.h" />
+    <ClInclude Include="MixerView.xaml.h">
+      <DependentUpon>MixerView.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="PartRow.xaml.h">
+      <DependentUpon>PartRow.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="VoiceMeter.xaml.h">
+      <DependentUpon>VoiceMeter.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="TransportView.xaml.h">
       <DependentUpon>TransportView.xaml</DependentUpon>
     </ClInclude>
@@ -271,13 +289,20 @@
     <Midl Include="MainWindow.idl" />
     <Midl Include="PartModel.idl" />
     <Midl Include="PlayerModel.idl" />
+    <Midl Include="MixerView.idl" />
+    <Midl Include="PartRow.idl" />
+    <Midl Include="VoiceMeter.idl" />
     <Midl Include="TransportView.idl" />
   </ItemGroup>
 
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MainWindow.xaml" />
+    <Page Include="MixerView.xaml" />
+    <Page Include="PartRow.xaml" />
+    <Page Include="VoiceMeter.xaml" />
     <Page Include="TransportView.xaml" />
+    <Page Include="Styles.xaml" />
   </ItemGroup>
 
   <ItemGroup>

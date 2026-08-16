@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="WindowsTSPlayer.VoiceMeter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WindowsTSPlayer"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <!--
+        Six rectangles, where the GTK build needed a hundred and seventy lines of GtkSnapshot: a
+        custom widget there has to measure and draw itself, and here the same thing is a StackPanel.
+        The geometry is carried over unchanged so the three front ends read alike - 3px bars, 2px
+        apart, 12px tall, fully rounded.
+
+        The unlit bars are the foreground at low alpha rather than a separate colour, so the meter
+        follows the theme without knowing anything about it, and the lit ones are the system accent.
+    -->
+    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+        <Rectangle x:Name="Bar0" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+        <Rectangle x:Name="Bar1" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+        <Rectangle x:Name="Bar2" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+        <Rectangle x:Name="Bar3" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+        <Rectangle x:Name="Bar4" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+        <Rectangle x:Name="Bar5" Width="3" Height="12" RadiusX="1.5" RadiusY="1.5" />
+    </StackPanel>
+</UserControl>

@@ -92,6 +92,20 @@ namespace WindowsTSPlayer
         void SetSoloed(Int32 part, Boolean soloed);
         void ResetChannels();
 
+        /// Sends a control change to whatever part listens on `channel` of `port`, both 0-based.
+        ///
+        /// Addressed by receive channel rather than by part index, unlike mute and solo just above:
+        /// those are a host-side gate keyed on the slot, and this is a MIDI message the engine
+        /// dispatches exactly as it dispatches the file's own controllers. The two differ as soon as
+        /// anything moves a part, and keying this on the slot would then aim it at a channel nothing
+        /// is listening to.
+        ///
+        /// It follows that this is not a setting: the value lasts until the song's next controller,
+        /// a seek or a reset overwrites it, and a part whose GS receive switch for that controller
+        /// is off will ignore it outright. Whatever reads the result back has to be ready for all
+        /// three.
+        void SendControl(Int32 port, Int32 channel, Int32 controller, Int32 value);
+
         /// The output backend and the rate the hardware is actually running at, which is not the
         /// engine's. For the about box and for bug reports.
         String BackendDescription{ get; };

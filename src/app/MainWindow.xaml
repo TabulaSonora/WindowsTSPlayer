@@ -10,68 +10,81 @@
     Title="Tabula Sonora Player">
 
     <!--
-        Still deliberately unlovely. This milestone is the model, not the interface: the strip layout,
-        the height budget that fits sixteen parts on screen, the faders and their echo latch all
-        arrive later. What has to be right here is that the rows are built once and updated in place,
-        which is a thing you watch rather than read.
+        No Background on this Grid, and that is load-bearing rather than an omission. A backdrop is
+        drawn behind the window's content, so any opaque brush anywhere up this tree hides it
+        completely - and the failure looks like Mica not being applied rather than like something
+        painting over it.
     -->
-    <Grid Padding="16" RowSpacing="12">
+    <Grid RowSpacing="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="32" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!--
+            The title bar, drawn by the app rather than by the system.
+
+            Extending into it is not decoration here: it is what makes the backdrop continuous. Left
+            to the system, the caption strip is painted its own solid colour and the Mica stops at a
+            hard edge an inch below the top of the window, which reads as a bug.
+
+            The height is the caption height, and the right-hand padding in code keeps this clear of
+            the minimise, maximise and close buttons - whose width is not a constant and has to be
+            asked for.
+        -->
+        <Grid x:Name="TitleBarArea" Grid.Row="0">
+            <TextBlock x:Name="TitleBarText"
+                       Text="Tabula Sonora Player"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       VerticalAlignment="Center"
+                       Margin="16,0,0,0" />
+        </Grid>
+
+        <!--
             Opening files still lives on a row of buttons. The menu, the drag target and the
             recent-files list arrive with the settings milestone; until then this is what puts a ROM
             and a song into the model.
         -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="16,0">
             <Button x:Name="OpenRomButton" Content="Open SCCore.dll..." Click="OnOpenRomClick" />
             <Button x:Name="OpenSongButton" Content="Open song..." IsEnabled="False" Click="OnOpenSongClick" />
             <Button x:Name="ExportButton" Content="Export WAV..." IsEnabled="False" Click="OnExportClick" />
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis" Text="No ROM loaded." />
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Spacing="6">
+        <StackPanel Grid.Row="2" Spacing="6" Margin="16,0">
             <local:TransportView x:Name="Transport" />
             <TextBlock x:Name="ChurnText" FontFamily="Consolas" Opacity="0.5" FontSize="11" Text="" />
         </StackPanel>
 
         <!--
-            SelectionMode None because a mixer strip is not a selectable thing; the row is a set of
-            readouts and, later, controls. IsItemClickEnabled stays off for the same reason.
-        -->
-        <ListView Grid.Row="2"
-                  x:Name="PartList"
-                  SelectionMode="None"
-                  ItemsSource="{x:Bind Model.VisibleParts, Mode=OneWay}">
-            <ListView.ItemTemplate>
-                <DataTemplate x:DataType="local:PartModel">
-                    <!-- Dimmed is bound but not yet rendered: showing "something else is soloed"
-                         is a mixer-styling question and arrives with the strip layout. -->
-                    <Grid ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="44" />
-                            <ColumnDefinition Width="200" />
-                            <ColumnDefinition Width="52" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
+            The mixer, raised onto a layer.
 
-                        <TextBlock Grid.Column="0"
-                                   FontFamily="Consolas"
-                                   Text="{x:Bind Label, Mode=OneWay}"
-                                   ToolTipService.ToolTip="{x:Bind Address, Mode=OneWay}" />
-                        <TextBlock Grid.Column="1" Text="{x:Bind Name, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Grid.Column="2" FontFamily="Consolas" Text="{x:Bind Voices, Mode=OneWay}" />
-                        <TextBlock Grid.Column="3"
-                                   Opacity="0.6"
-                                   TextTrimming="CharacterEllipsis"
-                                   Text="{x:Bind Detail, Mode=OneWay}" />
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+            This is the half of the two-material effect that the backdrop API cannot give directly:
+            the window carries Mica Alt, the chrome above shows it bare, and the layer brush here
+            lifts the mixer back towards the lighter weight of plain Mica. LayerFillColorDefault is
+            the brush Fluent defines for exactly this - translucent, so the material still moves with
+            the desktop behind it, rather than an opaque panel that would blank it.
+
+            The stroke is what makes it read as a raised surface rather than as a patch of slightly
+            different tint.
+
+            Flush to the window on three sides, with the breathing room inside as padding rather than
+            outside as margin. A margin would leave a strip of bare Mica Alt below and beside the
+            mixer, which reads as the card floating in a gap rather than as the window's content
+            area; and the sixteen strips this has to fit would be paying for that gap twice, once at
+            each end. So the bottom border and the bottom corners go - they would be sitting on the
+            window's own rounded edge - and only the top corners stay rounded.
+        -->
+        <Border Grid.Row="3"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,1,1,0"
+                CornerRadius="8,8,0,0"
+                Padding="8,8,8,0">
+            <local:MixerView x:Name="Mixer" />
+        </Border>
     </Grid>
 </Window>

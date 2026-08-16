@@ -26,6 +26,9 @@ namespace winrt::WindowsTSPlayer::implementation
         void RememberRom(hstring const& path);
         void SetWindowIcon();
 
+        /// Mica behind the window, and the title bar extended so it is not interrupted.
+        void SetUpBackdrop();
+
         void OnModelPropertyChanged(
             IInspectable const& sender,
             Microsoft::UI::Xaml::Data::PropertyChangedEventArgs const& args);

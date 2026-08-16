@@ -486,4 +486,15 @@ namespace winrt::WindowsTSPlayer::implementation
     void PlayerModel::SetMuted(int32_t part, bool muted) { player_->set_muted(part, muted); }
     void PlayerModel::SetSoloed(int32_t part, bool soloed) { player_->set_soloed(part, soloed); }
     void PlayerModel::ResetChannels() { player_->reset_channels(); }
+
+    void PlayerModel::SendControl(int32_t port, int32_t channel, int32_t controller, int32_t value)
+    {
+        player_->send_channel(port, 0xB0 | (channel & 0x0F), controller, value);
+
+        // No Refresh() here, unlike mute and solo. Those write a mask the render thread reads
+        // directly, so a snapshot taken immediately after already reflects them. This queues a
+        // message in the live-MIDI inbox that is not applied until the next block, so refreshing now
+        // would publish the value from *before* the send, and a fader following that would visibly
+        // jump back under the pointer. The next tick reports it, some tens of milliseconds later.
+    }
 }

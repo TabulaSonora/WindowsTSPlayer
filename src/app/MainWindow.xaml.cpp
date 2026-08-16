@@ -6,6 +6,7 @@
 #endif
 
 #include "PlayerModel.h"
+#include "MixerView.xaml.h"
 #include "TransportView.xaml.h"
 
 // IWindowNative, which is how a WinUI 3 desktop window surrenders its HWND. There is no projected
@@ -56,8 +57,10 @@ namespace winrt::WindowsTSPlayer::implementation
         // element at all.
         InitializeComponent();
         SetWindowIcon();
+        SetUpBackdrop();
 
         Transport().Model(model_);
+        Mixer().Model(model_);
 
         model_.PropertyChanged({ this, &MainWindow::OnModelPropertyChanged });
 
@@ -71,10 +74,65 @@ namespace winrt::WindowsTSPlayer::implementation
             // destructor owns that teardown, and leaving it to process exit would let the render
             // thread and the WASAPI feeder outlive the XAML tree they are publishing into.
             Transport().Model(nullptr);
+            Mixer().Model(nullptr);
             model_ = nullptr;
         });
 
         RestoreRom();
+    }
+
+    void MainWindow::SetUpBackdrop()
+    {
+        // Mica Alt as the window's base, with the mixer lifted onto a layer above it.
+        //
+        // The intent is two materials: Mica Alt behind the title bar, the file controls and the
+        // transport, and the lighter Mica behind the mixer. That cannot be had literally. A backdrop
+        // is a property of the *window* - one SystemBackdrop, composited by the system behind
+        // everything - and UIElement does not implement ICompositionSupportsSystemBackdrop, so there
+        // is no way to give a region a material of its own.
+        //
+        // What produces the same reading is the layering Fluent is built around, and Mica Alt is
+        // specifically the kind meant to sit underneath it: the deeper, more strongly tinted base,
+        // with content raised onto translucent layers. So the window takes BaseAlt, the chrome shows
+        // it bare, and the mixer sits on a layer brush that lifts it back towards the weight of plain
+        // Mica. The hierarchy is the one intended; only the mechanism differs.
+        //
+        // Asked for rather than assumed. Mica needs Windows 11 and composition support, and on a
+        // machine without either, MicaBackdrop paints nothing at all: the window would come up with
+        // a transparent body over the desktop, because the root Grid deliberately has no background
+        // of its own. Leaving SystemBackdrop unset in that case gets the solid theme colour, and the
+        // mixer's layer brush still reads correctly over it.
+        if (Microsoft::UI::Composition::SystemBackdrops::MicaController::IsSupported()) {
+            Media::MicaBackdrop backdrop;
+            backdrop.Kind(Microsoft::UI::Composition::SystemBackdrops::MicaKind::BaseAlt);
+            SystemBackdrop(backdrop);
+        }
+
+        // The title bar has to come with it. A system-drawn caption is painted its own opaque colour,
+        // so the material would stop at a hard edge below the top of the window.
+        ExtendsContentIntoTitleBar(true);
+        SetTitleBar(TitleBarArea());
+
+        // The caption buttons are not a fixed width -- they differ with language, with the presence
+        // of a maximise button, and on a machine that shows the Widgets or Snap affordances -- so the
+        // clearance is read back from the window rather than guessed at. Re-read on every change,
+        // because moving the window between displays of different scale changes it.
+        const auto reserve = [this]() {
+            const auto titleBar = AppWindow().TitleBar();
+            const double scale = TitleBarArea().XamlRoot() != nullptr
+                                     ? TitleBarArea().XamlRoot().RasterizationScale()
+                                     : 1.0;
+            TitleBarArea().Padding(
+                ThicknessHelper::FromLengths(titleBar.LeftInset() / scale, 0,
+                                             titleBar.RightInset() / scale, 0));
+        };
+
+        // AppWindow::Changed, not a title-bar event: AppWindowTitleBar has none. The UWP type had
+        // LayoutMetricsChanged and the Windowing one does not, so the insets are re-read whenever the
+        // window itself changes, which covers the resize and the move between displays that would
+        // alter them.
+        AppWindow().Changed([reserve](auto&&, auto&&) { reserve(); });
+        reserve();
     }
 
     void MainWindow::SetWindowIcon()

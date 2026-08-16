@@ -1,0 +1,21 @@
+import "PartModel.idl";
+import "PlayerModel.idl";
+
+namespace WindowsTSPlayer
+{
+    [default_interface]
+    runtimeclass PartRow : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        PartRow();
+
+        /// The part this strip is showing. Set on bind and cleared on unbind by the list, which
+        /// recycles rows: whatever state the row keeps has to be reset here or it carries over to
+        /// the next part the row is handed.
+        PartModel Part;
+
+        /// Where mute, solo and the faders send to. Not a reference the row owns: the model outlives
+        /// every row, and an owning cycle through the window would keep the engine alive after the
+        /// window closed.
+        PlayerModel Model;
+    }
+}

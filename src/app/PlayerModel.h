@@ -78,6 +78,7 @@ namespace winrt::WindowsTSPlayer::implementation
         void SetMuted(int32_t part, bool muted);
         void SetSoloed(int32_t part, bool soloed);
         void ResetChannels();
+        void SendControl(int32_t port, int32_t channel, int32_t controller, int32_t value);
 
         winrt::event_token PropertyChanged(
             Microsoft::UI::Xaml::Data::PropertyChangedEventHandler const& handler);

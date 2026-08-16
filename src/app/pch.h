@@ -34,6 +34,12 @@
 #include <winrt/Microsoft.UI.Xaml.Interop.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+
+// MicaBackdrop lives in Microsoft.UI.Xaml.Media; MicaKind and the controller that answers whether
+// the material is available at all live in the composition namespace. Both are needed to ask before
+// setting, rather than setting and hoping.
+#include <winrt/Microsoft.UI.Composition.SystemBackdrops.h>
+#include <winrt/Microsoft.UI.Windowing.h>
 #include <winrt/Microsoft.UI.Xaml.Navigation.h>
 #include <winrt/Microsoft.UI.Xaml.Shapes.h>
 

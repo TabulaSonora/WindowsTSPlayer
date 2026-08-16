@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="WindowsTSPlayer.MixerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WindowsTSPlayer"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <!--
+            SelectionMode None and IsItemClickEnabled off, because a mixer strip is not a selectable
+            thing: it is a set of readouts and controls, and a selection highlight would only compete
+            with the mute and solo states for the reader's attention.
+        -->
+        <ListView x:Name="PartList"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Padding="0"
+                  ItemContainerStyle="{StaticResource MixerRowStyle}"
+                  ContainerContentChanging="OnContainerContentChanging">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:PartModel">
+                    <local:PartRow Part="{x:Bind}" />
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!--
+            Shown instead of the list, not beside it. A song addressing no parts is the ordinary
+            state before a file is open, and an empty list with a scrollbar says less than a sentence
+            does.
+        -->
+        <TextBlock x:Name="EmptyText"
+                   Visibility="Collapsed"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Opacity="0.6"
+                   Text="No parts to show. Open a song." />
+    </Grid>
+</UserControl>

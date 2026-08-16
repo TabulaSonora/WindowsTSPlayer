@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        This file exists for one reason, and it is the same reason the GTK build has a stylesheet: a
+        mixer strip has to be short enough that all sixteen parts of a General MIDI score are on
+        screen together. The mixer answers "which part is that" while the music is playing, and a
+        strip you have to scroll to find has already lost the moment; muting the wrong one and
+        scrolling back costs more than the answer was worth.
+
+        Stock WinUI metrics are worse than stock GTK's were. A ListViewItem has a 40px minimum, and a
+        Slider is 32px tall before anything is put in it - taller on its own than the whole strip is
+        meant to be. Sixteen stock rows want some 900px of list, which on a 1080p screen is more than
+        the window gets once the title bar and the transport are taken out. The rules below bring a
+        strip to about 32px, so sixteen fit in roughly 520px.
+
+        Everything here is scoped to the mixer by being applied through explicit styles rather than
+        by overriding the theme resources globally: a 4px slider is right on a strip and wrong on the
+        transport's gain, and the export bar in the transport needed the opposite correction.
+    -->
+
+    <!--
+        The row container is a floor, not a suggestion. ListViewItem carries a minimum height and its
+        own padding, and neither reacts to the strip inside getting shorter. Zeroing both hands the
+        vertical spacing to the strip's own margins, which is the one place it can be reasoned about.
+
+        HorizontalContentAlignment is Stretch because the default leaves the strip at its natural
+        width and every width threshold in PartRow would then measure the content rather than the
+        row - the faders would never be dropped no matter how narrow the window got.
+    -->
+    <Style x:Key="MixerRowStyle" TargetType="ListViewItem">
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Padding" Value="6,0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        Mute and solo are one letter each, so a stock button spends most of its height on padding
+        around a glyph half that tall. At 22px they are still comfortably clickable, and they are
+        what decides the height of the whole strip since nothing else in it is taller than a line of
+        text.
+    -->
+    <Style x:Key="MixerToggleStyle" TargetType="ToggleButton">
+        <Setter Property="MinHeight" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="MinWidth" Value="26" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        The faders, which stock are by a wide margin the tallest thing on a strip: 14px of margin
+        above and below a 4px track, 32px in total.
+
+        The margins are what carry the height, not the track, so they are what has to come down - and
+        the thumb has to come with them or it clips. At 6/4/6 the control measures 16px, comfortably
+        under the 22px the toggles above already set as the strip's floor, so adding faders costs no
+        height at all.
+
+        SliderHorizontalHeight has to be set as well as the margins. It is the control's own height
+        and does not follow from them; left at 32 it would hold the strip open on its own while the
+        track sat in the middle of the empty space.
+    -->
+    <Style x:Key="MixerFaderStyle" TargetType="Slider">
+        <Setter Property="Width" Value="60" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="IsThumbToolTipEnabled" Value="False" />
+    </Style>
+
+    <!--
+        The metrics themselves are not here, because they cannot be: Resources is not a
+        DependencyProperty and a Setter cannot target it. They live in PartRow's own resource scope
+        instead, which is the right place regardless - the faders resolve them up the tree, and
+        scoping them to the row is what keeps a 4px track from also being applied to the transport's
+        gain slider, where it would be wrong.
+    -->
+
+</ResourceDictionary>

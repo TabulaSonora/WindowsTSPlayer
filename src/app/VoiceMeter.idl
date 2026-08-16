@@ -1,0 +1,15 @@
+namespace WindowsTSPlayer
+{
+    [default_interface]
+    runtimeclass VoiceMeter : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        VoiceMeter();
+
+        /// Voices this part is sounding, including any fading after being stolen.
+        ///
+        /// Six bars, as in the Apple and GTK builds. It is not a count so much as a sense of how busy
+        /// a part is; past six the exact number stops being readable at a glance, and the tooltip
+        /// carries it instead.
+        Int32 Voices;
+    }
+}
