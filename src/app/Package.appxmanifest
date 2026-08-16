@@ -45,7 +45,16 @@
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <!--
+          Unqualified names, deliberately. Every one of these resolves to a scale-qualified file
+          (Square150x150Logo.scale-200.png and so on) that tools\Convert-Icons.ps1 generated; MRT
+          picks the variant matching the display. Naming a scale here instead would pin the tile to
+          one density.
+        -->
+        <uap:DefaultTile
+          Square71x71Logo="Assets\Square71x71Logo.png"
+          Square310x310Logo="Assets\Square310x310Logo.png"
+          Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
 

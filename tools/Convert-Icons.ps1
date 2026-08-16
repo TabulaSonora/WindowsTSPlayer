@@ -1,92 +1,151 @@
 <#
 .SYNOPSIS
-    Generates the MSIX tile and logo assets from the shared application icon.
+    Generates the MSIX tile and logo assets from the application icon master.
 
 .DESCRIPTION
-    The three front ends share one icon, and it is committed as PNGs rather than as the 2048x2048
-    master (see LinuxTSPlayer's tools/build-icons.sh, which says so). This script is the Windows
-    counterpart: it takes the largest committed size and produces the handful of assets
-    Package.appxmanifest names.
+    The three front ends share one icon. The master is a 2048x2048 PNG with an alpha channel and it
+    is **not committed** to any of the three repositories -- LinuxTSPlayer's tools/build-icons.sh
+    says the same of its own outputs. Only the generated sizes are committed, and this script is what
+    generates them for Windows.
 
-    Generated rather than committed, for the same reason the props file at the CMake/MSBuild seam is
-    generated: an asset checked in beside the icon it came from is a copy that can silently fall out
-    of date, and the failure -- a stale tile -- is one nobody notices for months.
+    Generated rather than hand-exported, for the same reason the props file at the CMake/MSBuild seam
+    is generated: an asset committed beside the icon it came from is a copy that can silently fall
+    out of date, and a stale tile is a thing nobody notices for months.
 
-    A caveat worth knowing before this is trusted for the Store. The largest committed source is
-    512px, and Square150x150Logo at 400% scale wants 600px, so that one tile is upscaled. It is
-    fine for development and for sideloading; a Store submission wants the master re-exported at
-    600px or larger instead. This is called out in the plan rather than hidden here.
+    Every asset is emitted scale-qualified -- Square150x150Logo.scale-200.png rather than
+    Square150x150Logo.png -- which is what the resource system actually wants. Package.appxmanifest
+    keeps referring to the unqualified name; MRT resolves it to the right variant at runtime from the
+    display's scale factor. That is why the manifest needs no change when this set grows.
+
+    Square44x44Logo additionally gets targetsize variants, which are a different axis from scale and
+    not interchangeable with it: scale-* is for tiles, targetsize-* is what the taskbar, the Start
+    list and Explorer's "Open with" draw. The altform-unplated variants are the same images without
+    the system's background plate, used where the shell composites the icon onto its own surface.
 
 .PARAMETER Source
-    The source PNG. Defaults to the 512px icon in a sibling LinuxTSPlayer checkout, which is where
-    the shared icon actually lives.
+    The 2048x2048 master. Defaults to $env:TS_ICON_MASTER, then to the known location on this
+    machine. Fails with a readable message rather than silently upscaling something smaller.
 
 .PARAMETER Destination
     Where to write. Defaults to src/app/Assets.
 #>
 [CmdletBinding()]
 param(
-    [string] $Source = (Join-Path $PSScriptRoot '..\..\LinuxTSPlayer\data\icons\hicolor\512x512\apps\co.losno.TabulaSonoraPlayer.png'),
+    [string] $Source,
     [string] $Destination = (Join-Path $PSScriptRoot '..\src\app\Assets')
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path $Source)) {
-    throw "Source icon not found: $Source`nPass -Source explicitly, or check out LinuxTSPlayer beside this repository."
+if (-not $Source) {
+    $candidates = @(
+        $env:TS_ICON_MASTER,
+        'D:\ts-icon\ts-iOS-Default-1024@2x.png'
+    ) | Where-Object { $_ }
+
+    $Source = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
+
+if (-not $Source -or -not (Test-Path $Source)) {
+    throw @"
+Icon master not found.
+
+The master is a 2048x2048 PNG and is deliberately not committed. Point at it with
+
+    -Source <path>
+
+or set TS_ICON_MASTER. Anything smaller will upscale: Square150x150Logo at 400% needs 600px and
+SplashScreen at 400% needs 1240px of width, both beyond the largest size any of the three
+repositories commits.
+"@
 }
 
 Add-Type -AssemblyName System.Drawing
+
+$src = [System.Drawing.Image]::FromFile((Resolve-Path $Source))
+
+if ($src.Width -lt 600 -or $src.Height -lt 600) {
+    $src.Dispose()
+    throw "Source is $($src.Width)x$($src.Height); at least 600x600 is needed for the 400% tile."
+}
 
 if (-not (Test-Path $Destination)) {
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
 }
 
-# Width, height, and the base name the manifest refers to. The square tiles scale the icon to fill;
-# the two wide ones letterbox it centred on transparency, because stretching a square logo to 310x150
-# is the one thing that makes a tile look broken rather than merely low-resolution.
-$targets = @(
-    @{ Name = 'Square44x44Logo';  W = 44;  H = 44  },
+# Base sizes at 100%. The square tiles scale the icon to fill; the two wide ones letterbox it centred
+# on transparency, because stretching a square logo to 310x150 is the one thing that makes a tile
+# look broken rather than merely low-resolution.
+$scaled = @(
+    @{ Name = 'Square44x44Logo';   W = 44;  H = 44  },
+    @{ Name = 'Square71x71Logo';   W = 71;  H = 71  },
     @{ Name = 'Square150x150Logo'; W = 150; H = 150 },
-    @{ Name = 'StoreLogo';        W = 50;  H = 50  },
-    @{ Name = 'LockScreenLogo';   W = 24;  H = 24  },
-    @{ Name = 'Wide310x150Logo';  W = 310; H = 150 },
-    @{ Name = 'SplashScreen';     W = 620; H = 300 }
+    @{ Name = 'Square310x310Logo'; W = 310; H = 310 },
+    @{ Name = 'Wide310x150Logo';   W = 310; H = 150 },
+    @{ Name = 'StoreLogo';         W = 50;  H = 50  },
+    @{ Name = 'SplashScreen';      W = 620; H = 300 },
+    @{ Name = 'LockScreenLogo';    W = 24;  H = 24  }
 )
 
-$src = [System.Drawing.Image]::FromFile((Resolve-Path $Source))
+# The scale factors Windows actually ships displays at.
+$scales = @(100, 125, 150, 200, 400)
+
+# targetsize is the shell's axis, not the tile system's.
+$targetSizes = @(16, 24, 32, 48, 256)
+
+function Write-Asset {
+    param(
+        [System.Drawing.Image] $Image,
+        [int] $Width,
+        [int] $Height,
+        [string] $Path
+    )
+
+    $bmp = New-Object System.Drawing.Bitmap($Width, $Height, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    try {
+        $g.Clear([System.Drawing.Color]::Transparent)
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.PixelOffsetMode   = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+
+        # Fit, never fill: preserve the aspect ratio and centre what is left over.
+        $scale = [Math]::Min($Width / $Image.Width, $Height / $Image.Height)
+        $w = [int][Math]::Round($Image.Width * $scale)
+        $h = [int][Math]::Round($Image.Height * $scale)
+        $g.DrawImage($Image, [int][Math]::Round(($Width - $w) / 2), [int][Math]::Round(($Height - $h) / 2), $w, $h)
+    }
+    finally {
+        $g.Dispose()
+    }
+
+    $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    $bmp.Dispose()
+}
+
+$count = 0
 try {
-    foreach ($t in $targets) {
-        $bmp = New-Object System.Drawing.Bitmap($t.W, $t.H, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-        $g = [System.Drawing.Graphics]::FromImage($bmp)
-        try {
-            $g.Clear([System.Drawing.Color]::Transparent)
-            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-            $g.PixelOffsetMode   = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-            $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    # Anything previously generated goes, so a renamed or dropped asset cannot linger in the package.
+    Get-ChildItem $Destination -Filter '*.png' -ErrorAction SilentlyContinue | Remove-Item -Force
 
-            # Fit, never fill: preserve the aspect ratio and centre what is left over.
-            $scale = [Math]::Min($t.W / $src.Width, $t.H / $src.Height)
-            $w = [int][Math]::Round($src.Width * $scale)
-            $h = [int][Math]::Round($src.Height * $scale)
-            $x = [int][Math]::Round(($t.W - $w) / 2)
-            $y = [int][Math]::Round(($t.H - $h) / 2)
-
-            $g.DrawImage($src, $x, $y, $w, $h)
+    foreach ($a in $scaled) {
+        foreach ($s in $scales) {
+            $w = [int][Math]::Round($a.W * $s / 100)
+            $h = [int][Math]::Round($a.H * $s / 100)
+            Write-Asset -Image $src -Width $w -Height $h -Path (Join-Path $Destination "$($a.Name).scale-$s.png")
+            $count++
         }
-        finally {
-            $g.Dispose()
-        }
+    }
 
-        $out = Join-Path $Destination "$($t.Name).png"
-        $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
-        $bmp.Dispose()
-        Write-Host "  $($t.Name).png  $($t.W)x$($t.H)"
+    foreach ($t in $targetSizes) {
+        Write-Asset -Image $src -Width $t -Height $t -Path (Join-Path $Destination "Square44x44Logo.targetsize-$t.png")
+        Write-Asset -Image $src -Width $t -Height $t -Path (Join-Path $Destination "Square44x44Logo.targetsize-$t`_altform-unplated.png")
+        $count += 2
     }
 }
 finally {
     $src.Dispose()
 }
 
-Write-Host "Wrote $($targets.Count) assets to $Destination"
+Write-Host "Wrote $count assets to $Destination from $Source"

@@ -89,6 +89,18 @@ $layout = Join-Path $PSScriptRoot "src\app\x64\$Configuration\WindowsTSPlayer\Ap
 if ($Register) {
     Write-Host '==> Add-AppxPackage -Register' -ForegroundColor Cyan
     if (-not (Test-Path $layout)) { throw "Loose layout not found: $layout" }
+
+    # Unregister first. Registering over an existing registration of the same version fails with
+    # 0x80073CFB ("the package is already installed, and reinstallation was blocked"), and the
+    # message's own suggestion -- increment the version -- is wrong for a development loop, where the
+    # version is meaningful and the layout is rebuilt dozens of times at one version. Removing the
+    # registration does not touch the files; it only drops the identity that points at them.
+    $existing = Get-AppxPackage -Name 'co.losno.TabulaSonoraPlayer' -ErrorAction SilentlyContinue
+    if ($existing) {
+        Write-Host "    unregistering $($existing.PackageFullName)"
+        Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction Stop
+    }
+
     Add-AppxPackage -Register $layout
 }
 
