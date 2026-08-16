@@ -303,6 +303,12 @@ namespace winrt::WindowsTSPlayer::implementation
         }
 
         SetText(romName_, player_->rom_name(), L"RomName");
+
+        // Adopt the engine's own defaults rather than asserting ours. There is no session to ask
+        // before a ROM is loaded, so this is the first moment the real value exists, and a gain
+        // fader initialised to a guess would move the sound the instant anyone touched it.
+        Set(outputGain_, player_->settings().outputGain, L"OutputGain");
+
         StartTicking();
         co_return true;
     }
@@ -426,6 +432,53 @@ namespace winrt::WindowsTSPlayer::implementation
         }
         player_->set_looping(value);
         Set(looping_, value, L"Looping");
+    }
+
+    // -- Gain and export ---------------------------------------------------------------------------
+
+    void PlayerModel::OutputGain(double value)
+    {
+        value = std::clamp(value, 0.0, 2.0);
+        if (outputGain_ == value) {
+            return;
+        }
+
+        // Read the whole struct back from the session and put it straight back with one field
+        // changed, rather than keeping a mirror here. There is one copy of the truth, so a
+        // preferences dialog opened twice cannot disagree with itself -- and set_settings only
+        // rebuilds the generator when a *structural* field differs, which gain is not.
+        TSEngineSettings settings = player_->settings();
+        settings.outputGain = value;
+        player_->set_settings(settings);
+
+        Set(outputGain_, value, L"OutputGain");
+    }
+
+    IAsyncOperation<bool> PlayerModel::ExportWavAsync(hstring path)
+    {
+        auto lifetime = get_strong();
+        const std::string narrow = to_string(path);
+
+        Set(exporting_, true, L"Exporting");
+
+        std::string error;
+
+        co_await resume_background();
+        try {
+            // The callback is consulted exactly twice -- once at 0.0 before render_to_end and once
+            // at 1.0 after it -- so returning true unconditionally is the whole of what it can
+            // usefully do. It is not a place to report from and not a place to cancel from; see
+            // Session::run_export, where the single-call render is what keeps an export
+            // byte-identical to `tabula-sonora render`.
+            player_->export_wav(narrow, [](double) { return true; });
+        } catch (const std::exception& failure) {
+            error = failure.what();
+        }
+        co_await wil::resume_foreground(dispatcher_);
+
+        Set(exporting_, false, L"Exporting");
+        SetText(lastError_, error, L"LastError");
+        co_return error.empty();
     }
 
     // -- Mixer -------------------------------------------------------------------------------------

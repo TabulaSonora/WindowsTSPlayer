@@ -31,6 +31,22 @@ namespace WindowsTSPlayer
         Int32 VoiceCapacity{ get; };
         Int64 Underruns{ get; };
 
+        /// Linear gain on the finished mix, 0..2. Applied live: Session::set_settings rebuilds the
+        /// generator only when a structural field changes, and this is not one, so dragging a fader
+        /// over it does not cost the sounding voices.
+        Double OutputGain{ get; set; };
+
+        /// Whether an export is running. There is deliberately no ExportProgress beside it:
+        /// Session::run_export renders the whole song in one call and reports 0.0 before and 1.0
+        /// after, because chunking the render changes the audio and breaks byte-identity with
+        /// `tabula-sonora render`. A fraction would only ever be one of those two values.
+        Boolean Exporting{ get; };
+
+        /// Renders the loaded song to a WAV on a worker thread, over a second generator, while
+        /// playback continues. Not cancellable once the render starts, for the same reason: the
+        /// progress callback is not consulted again until it is over.
+        Windows.Foundation.IAsyncOperation<Boolean> ExportWavAsync(String path);
+
         /// What the last failed call said. Async loads report success as a Boolean and leave the
         /// message here rather than throwing across the ABI, where a std::exception's text would be
         /// lost and an hresult_error would carry a number nobody can act on.

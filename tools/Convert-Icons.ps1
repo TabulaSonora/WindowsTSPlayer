@@ -143,6 +143,80 @@ try {
         Write-Asset -Image $src -Width $t -Height $t -Path (Join-Path $Destination "Square44x44Logo.targetsize-$t`_altform-unplated.png")
         $count += 2
     }
+
+    # ---------------------------------------------------------------------------------------------
+    # The window icon, which the tiles above do not cover.
+    #
+    # A packaged app's taskbar and Start entries come from the manifest's logos, but the title bar,
+    # the Alt-Tab card and the window's system menu take their icon from the HWND, and WinUI 3 never
+    # sets one from the package. The result is a correct icon everywhere except the window itself.
+    # AppWindow::SetIcon wants a real .ico file, so one is assembled here.
+    #
+    # Written by hand rather than through System.Drawing's Icon type, which cannot author a
+    # multi-resolution icon at all. The container is simple: a six-byte header, a sixteen-byte
+    # directory entry per image, then the images. The payloads are PNG rather than BMP, which every
+    # Windows since Vista accepts and which keeps the alpha channel without the AND-mask dance.
+    # ---------------------------------------------------------------------------------------------
+    $icoSizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
+    $payloads = @()
+
+    foreach ($s in $icoSizes) {
+        $bmp = New-Object System.Drawing.Bitmap($s, $s, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        try {
+            $g.Clear([System.Drawing.Color]::Transparent)
+            $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $g.PixelOffsetMode   = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+            $g.SmoothingMode     = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+            $g.DrawImage($src, 0, 0, $s, $s)
+        }
+        finally {
+            $g.Dispose()
+        }
+
+        $ms = New-Object System.IO.MemoryStream
+        $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bmp.Dispose()
+        $payloads += , $ms.ToArray()
+        $ms.Dispose()
+    }
+
+    $icoPath = Join-Path $Destination 'AppIcon.ico'
+    $fs = [System.IO.File]::Create($icoPath)
+    $bw = New-Object System.IO.BinaryWriter($fs)
+    try {
+        $bw.Write([UInt16]0)                    # reserved
+        $bw.Write([UInt16]1)                    # type: icon
+        $bw.Write([UInt16]$icoSizes.Count)
+
+        # Images start after the header and the whole directory.
+        $offset = 6 + (16 * $icoSizes.Count)
+
+        for ($i = 0; $i -lt $icoSizes.Count; $i++) {
+            $s = $icoSizes[$i]
+            # 256 is encoded as zero; the field is one byte and 256 does not fit.
+            $bw.Write([Byte]($(if ($s -ge 256) { 0 } else { $s })))
+            $bw.Write([Byte]($(if ($s -ge 256) { 0 } else { $s })))
+            $bw.Write([Byte]0)                  # palette entries: none, this is truecolour
+            $bw.Write([Byte]0)                  # reserved
+            $bw.Write([UInt16]1)                # colour planes
+            $bw.Write([UInt16]32)               # bits per pixel
+            $bw.Write([UInt32]$payloads[$i].Length)
+            $bw.Write([UInt32]$offset)
+            $offset += $payloads[$i].Length
+        }
+
+        foreach ($p in $payloads) {
+            $bw.Write($p)
+        }
+    }
+    finally {
+        $bw.Dispose()
+        $fs.Dispose()
+    }
+
+    $count++
+    Write-Host "  AppIcon.ico  $($icoSizes -join ', ')"
 }
 finally {
     $src.Dispose()

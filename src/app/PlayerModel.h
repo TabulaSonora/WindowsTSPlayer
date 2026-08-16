@@ -5,6 +5,7 @@
 #include "host/ts_types.h"
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -41,6 +42,13 @@ namespace winrt::WindowsTSPlayer::implementation
         int32_t ActiveVoices() const noexcept { return activeVoices_; }
         int32_t VoiceCapacity() const noexcept { return voiceCapacity_; }
         int64_t Underruns() const noexcept { return underruns_; }
+
+        double OutputGain() const noexcept { return outputGain_; }
+        void OutputGain(double value);
+
+        bool Exporting() const noexcept { return exporting_; }
+
+        Windows::Foundation::IAsyncOperation<bool> ExportWavAsync(hstring path);
 
         hstring LastError() const { return lastError_; }
         hstring BackendDescription() const { return backendDescription_; }
@@ -124,6 +132,9 @@ namespace winrt::WindowsTSPlayer::implementation
 
         double position_{ 0.0 };
         double duration_{ 0.0 };
+
+        double outputGain_{ 1.0 };
+        bool exporting_{ false };
 
         int32_t activeVoices_{ 0 };
         int32_t voiceCapacity_{ 0 };

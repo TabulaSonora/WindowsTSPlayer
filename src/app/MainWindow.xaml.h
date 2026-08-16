@@ -14,20 +14,21 @@ namespace winrt::WindowsTSPlayer::implementation
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
         winrt::fire_and_forget OnOpenSongClick(
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPlayPauseClick(
-            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnRestartClick(
-            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnPanicClick(
-            IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
-        void OnLoopClick(
+        winrt::fire_and_forget OnExportClick(
             IInspectable const& sender, Microsoft::UI::Xaml::RoutedEventArgs const& args);
 
     private:
+        /// Loads the ROM remembered from last time, if there still is one. Fire-and-forget from the
+        /// constructor: a full identity check reads 27 MB and has no business blocking the window
+        /// from appearing.
+        winrt::fire_and_forget RestoreRom();
+
+        void RememberRom(hstring const& path);
+        void SetWindowIcon();
+
         void OnModelPropertyChanged(
             IInspectable const& sender,
             Microsoft::UI::Xaml::Data::PropertyChangedEventArgs const& args);
-        void UpdateReadouts();
 
         HWND Hwnd();
 
@@ -36,7 +37,7 @@ namespace winrt::WindowsTSPlayer::implementation
         /// How many times the visible list has been altered, and how many model updates have
         /// arrived.
         ///
-        /// This exists to make the milestone's claim checkable rather than assertable: play a
+        /// This exists to make the mixer milestone's claim checkable rather than assertable: play a
         /// sixteen-part file and the first number must settle and stay put while the second climbs.
         /// A development readout; it goes when the real mixer arrives.
         uint64_t listChanges_{ 0 };

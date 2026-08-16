@@ -197,6 +197,18 @@
         to /W3, so the warnings that matter stay on.
       -->
       <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+
+      <!--
+        Source and execution character sets both UTF-8. MSVC otherwise reads a file with no BOM in
+        the system code page, which quietly mangles any non-ASCII literal on a machine whose ACP is
+        not UTF-8 - and the sources here carry the middle dots that join clauses on a mixer strip,
+        the em dash a part with no name shows, and Segoe MDL2 glyph codepoints.
+
+        This is the compile-time half of the pair. app.manifest declares the *process* code page as
+        UTF-8, which is what makes narrow Win32 and CRT calls interpret paths correctly at runtime.
+        Neither implies the other and this program needs both.
+      -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -216,6 +228,9 @@
     </ClCompile>
     <ClCompile Include="PartModel.cpp" />
     <ClCompile Include="PlayerModel.cpp" />
+    <ClCompile Include="TransportView.xaml.cpp">
+      <DependentUpon>TransportView.xaml</DependentUpon>
+    </ClCompile>
 
     <!--
       cppwinrt generates module.g.cpp and then leaves it to the project to compile: its targets add
@@ -245,6 +260,9 @@
     </ClInclude>
     <ClInclude Include="PartModel.h" />
     <ClInclude Include="PlayerModel.h" />
+    <ClInclude Include="TransportView.xaml.h">
+      <DependentUpon>TransportView.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="ToneMap.h" />
   </ItemGroup>
 
@@ -253,11 +271,13 @@
     <Midl Include="MainWindow.idl" />
     <Midl Include="PartModel.idl" />
     <Midl Include="PlayerModel.idl" />
+    <Midl Include="TransportView.idl" />
   </ItemGroup>
 
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MainWindow.xaml" />
+    <Page Include="TransportView.xaml" />
   </ItemGroup>
 
   <ItemGroup>
@@ -275,6 +295,15 @@
   -->
   <ItemGroup>
     <Image Include="Assets\*.png" />
+
+    <!--
+      The window icon, which the tiles do not cover: the title bar, the Alt-Tab card and the system
+      menu take theirs from the HWND, and WinUI 3 sets none from the package.
+
+      An Image item, like the tiles beside it, because that is the item type this project system
+      actually packages.
+    -->
+    <Image Include="Assets\AppIcon.ico" />
   </ItemGroup>
 
   <!--
@@ -282,16 +311,25 @@
     coefficients compiled into the engine are Roland-derived, and NativeTS requires the notice to
     travel with any binary built from it. A package without these two files is a licensing problem,
     not a missing nicety.
+
+    None with CopyToOutputDirectory, not Content, and the difference is not cosmetic. In a C++ MSIX
+    build the packaging targets read @(Content) for exactly four special files - the manifest, the
+    layout file, the store association and the bundle mapping - and ignore it otherwise. What
+    actually reaches the package is whatever GetCopyToOutputDirectoryItemsOutputGroup returns. The
+    obvious spelling therefore shipped nothing, silently, and a build that omits the notice looks
+    identical to one that includes it.
   -->
   <ItemGroup>
-    <Content Include="..\..\NOTICE.md">
+    <None Include="..\..\NOTICE.md">
       <Link>NOTICE.md</Link>
       <DeploymentContent>true</DeploymentContent>
-    </Content>
-    <Content Include="..\..\LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\LICENSE">
       <Link>LICENSE</Link>
       <DeploymentContent>true</DeploymentContent>
-    </Content>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <!--

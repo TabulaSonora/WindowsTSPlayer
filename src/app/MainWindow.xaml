@@ -22,19 +22,21 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!--
+            Opening files still lives on a row of buttons. The menu, the drag target and the
+            recent-files list arrive with the settings milestone; until then this is what puts a ROM
+            and a song into the model.
+        -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button x:Name="OpenRomButton" Content="Open SCCore.dll..." Click="OnOpenRomClick" />
             <Button x:Name="OpenSongButton" Content="Open song..." IsEnabled="False" Click="OnOpenSongClick" />
-            <Button x:Name="PlayPauseButton" Content="Pause" IsEnabled="False" Click="OnPlayPauseClick" />
-            <Button x:Name="RestartButton" Content="Restart" IsEnabled="False" Click="OnRestartClick" />
-            <Button x:Name="PanicButton" Content="Panic" IsEnabled="False" Click="OnPanicClick" />
-            <ToggleButton x:Name="LoopButton" Content="Loop" IsEnabled="False" Click="OnLoopClick" />
+            <Button x:Name="ExportButton" Content="Export WAV..." IsEnabled="False" Click="OnExportClick" />
+            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis" Text="No ROM loaded." />
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Spacing="4">
-            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="No ROM loaded." />
-            <TextBlock x:Name="EngineText" FontFamily="Consolas" Text="engine idle" />
-            <TextBlock x:Name="ChurnText" FontFamily="Consolas" Opacity="0.6" Text="" />
+        <StackPanel Grid.Row="1" Spacing="6">
+            <local:TransportView x:Name="Transport" />
+            <TextBlock x:Name="ChurnText" FontFamily="Consolas" Opacity="0.5" FontSize="11" Text="" />
         </StackPanel>
 
         <!--

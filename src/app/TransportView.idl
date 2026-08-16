@@ -1,0 +1,15 @@
+import "PlayerModel.idl";
+
+namespace WindowsTSPlayer
+{
+    [default_interface]
+    runtimeclass TransportView : Microsoft.UI.Xaml.Controls.UserControl
+    {
+        TransportView();
+
+        /// Set once by the window that owns it. Not a DependencyProperty: there is exactly one of
+        /// these and exactly one model, and a dependency property would buy style-driven binding
+        /// nothing here while costing the registration and the null-handling that comes with it.
+        PlayerModel Model;
+    }
+}

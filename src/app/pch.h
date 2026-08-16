@@ -26,6 +26,11 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
 #include <winrt/Microsoft.UI.Xaml.Data.h>
+
+// Not optional despite Microsoft.UI.Xaml.h forward-declaring the types: without this the delegate
+// constructors are declared and never defined, and a lambda handed to PointerEventHandler compiles
+// and then fails at link with an unresolved external naming the lambda.
+#include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Interop.h>
 #include <winrt/Microsoft.UI.Xaml.Markup.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
