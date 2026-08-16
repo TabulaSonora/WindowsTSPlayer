@@ -27,8 +27,15 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
+            <!--
+                Fixed widths, for the same reason the controls row below is laid out the way it is:
+                these are Auto columns either side of the starred scrubber, so a readout that grows
+                when the song passes ten minutes would shorten the slider and shift its handle. Wide
+                enough for "-00:00" so nothing has to reflow at any length this program can show.
+            -->
             <TextBlock x:Name="ElapsedText" Grid.Column="0"
-                       FontFamily="Consolas" VerticalAlignment="Center" Text="0:00" />
+                       FontFamily="Consolas" MinWidth="46" TextAlignment="Right"
+                       VerticalAlignment="Center" Text="0:00" />
 
             <!--
                 StepFrequency is a second, not the default, which for a range of a few hundred is
@@ -42,15 +49,29 @@
                     VerticalAlignment="Center" />
 
             <TextBlock x:Name="TotalText" Grid.Column="2"
-                       FontFamily="Consolas" VerticalAlignment="Center" Text="0:00" />
+                       FontFamily="Consolas" MinWidth="46"
+                       VerticalAlignment="Center" Text="0:00" />
         </Grid>
 
         <!-- Controls -->
+        <!--
+            Auto, Auto, star - not Auto, star, Auto.
+
+            The obvious arrangement centres the gain in a starred middle column, and that column's
+            width is then whatever the status readouts on the right are not using. So the gain slider
+            moved every time the voice count crossed from two digits to one, or the XG badge
+            appeared, or a dropout count showed up: the handle drifted under the pointer for reasons
+            that had nothing to do with the pointer.
+
+            Sizing the gain to its content and letting the status take the slack fixes it at the
+            source. The status is right-aligned inside the starred column, so when it changes width it
+            grows leftwards into empty space and nothing to its left moves at all.
+        -->
         <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4">
@@ -82,7 +103,7 @@
 
             <!-- Gain -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
-                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                        HorizontalAlignment="Left" VerticalAlignment="Center">
                 <FontIcon Glyph="&#xE767;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="14" Opacity="0.6" />
                 <Slider x:Name="GainSlider" Width="120"
                         Minimum="0" Maximum="2" StepFrequency="0.01"
@@ -94,7 +115,8 @@
             </StackPanel>
 
             <!-- Status -->
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Right" VerticalAlignment="Center">
                 <TextBlock x:Name="VoicesText" FontFamily="Consolas" Opacity="0.7" Text="0/0 voices" />
                 <Border x:Name="XgBadge" Visibility="Collapsed"
                         Background="{ThemeResource AccentFillColorDefaultBrush}"

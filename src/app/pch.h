@@ -18,6 +18,11 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.Pickers.h>
+
+// The MRU list, which is how a file the user chose once can be reopened later without asking for
+// it again, and the drag-and-drop formats.
+#include <winrt/Windows.Storage.AccessCache.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>
 
 #include <winrt/Microsoft.UI.Composition.h>

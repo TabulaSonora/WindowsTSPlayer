@@ -228,6 +228,9 @@
     </ClCompile>
     <ClCompile Include="PartModel.cpp" />
     <ClCompile Include="PlayerModel.cpp" />
+    <ClCompile Include="PrefsDialog.cpp" />
+    <ClCompile Include="SettingsRows.cpp" />
+    <ClCompile Include="SettingsStore.cpp" />
     <ClCompile Include="MixerView.xaml.cpp">
       <DependentUpon>MixerView.xaml</DependentUpon>
     </ClCompile>
@@ -269,6 +272,9 @@
     </ClInclude>
     <ClInclude Include="PartModel.h" />
     <ClInclude Include="PlayerModel.h" />
+    <ClInclude Include="PrefsDialog.h" />
+    <ClInclude Include="SettingsRows.h" />
+    <ClInclude Include="SettingsStore.h" />
     <ClInclude Include="MixerView.xaml.h">
       <DependentUpon>MixerView.xaml</DependentUpon>
     </ClInclude>

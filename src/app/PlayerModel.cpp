@@ -434,6 +434,23 @@ namespace winrt::WindowsTSPlayer::implementation
         Set(looping_, value, L"Looping");
     }
 
+    // -- Settings ----------------------------------------------------------------------------------
+
+    void PlayerModel::ApplyEngineSettings(const TSEngineSettings& settings)
+    {
+        player_->set_settings(settings);
+
+        // Read back rather than mirrored. Session::set_settings is free to normalise what it was
+        // given, and the transport's gain slider has to show what the engine holds rather than what
+        // was asked for.
+        Set(outputGain_, player_->settings().outputGain, L"OutputGain");
+    }
+
+    void PlayerModel::SetLatencyMs(int milliseconds)
+    {
+        player_->set_latency_ms(milliseconds);
+    }
+
     // -- Gain and export ---------------------------------------------------------------------------
 
     void PlayerModel::OutputGain(double value)

@@ -15,7 +15,13 @@
         completely - and the failure looks like Mica not being applied rather than like something
         painting over it.
     -->
-    <Grid RowSpacing="12">
+    <!--
+        AllowDrop on the root, so a file dropped anywhere in the window is taken. Restricting the
+        target to the mixer or the transport would make the reader guess which half of the window is
+        the one that accepts files, and there is no second thing a drop here could mean.
+    -->
+    <Grid x:Name="RootGrid" RowSpacing="12" AllowDrop="True"
+          DragOver="OnDragOver" Drop="OnDrop">
         <Grid.RowDefinitions>
             <RowDefinition Height="32" />
             <RowDefinition Height="Auto" />
@@ -48,9 +54,22 @@
             and a song into the model.
         -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="16,0">
-            <Button x:Name="OpenRomButton" Content="Open SCCore.dll..." Click="OnOpenRomClick" />
+            <Button x:Name="OpenRomButton" Content="Import SCCore.dll..." Click="OnOpenRomClick" />
             <Button x:Name="OpenSongButton" Content="Open song..." IsEnabled="False" Click="OnOpenSongClick" />
+
+            <!--
+                Recent songs. A DropDownButton rather than a SplitButton: its primary half would have
+                to mean "open the most recent one", and a button whose click target does something
+                different from its arrow is how people open the wrong file.
+            -->
+            <DropDownButton x:Name="RecentButton" Content="Recent" IsEnabled="False">
+                <DropDownButton.Flyout>
+                    <MenuFlyout x:Name="RecentFlyout" Placement="Bottom" />
+                </DropDownButton.Flyout>
+            </DropDownButton>
+
             <Button x:Name="ExportButton" Content="Export WAV..." IsEnabled="False" Click="OnExportClick" />
+            <Button x:Name="PrefsButton" Content="Preferences..." Click="OnPrefsClick" />
             <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis" Text="No ROM loaded." />
         </StackPanel>
 

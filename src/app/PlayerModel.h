@@ -98,6 +98,17 @@ namespace winrt::WindowsTSPlayer::implementation
         /// `SongInfo` is a C++ type that cannot cross an ABI.
         const ts::host::SongInfo& SongInfo() const;
 
+        /// The whole engine struct at once, so N changed keys cost one rebuild rather than N.
+        ///
+        /// Not projected: TSEngineSettings is a C source struct and cannot appear in an .idl.
+        /// Reached through winrt::get_self, like PartState, which is the standard escape hatch.
+        void ApplyEngineSettings(const TSEngineSettings& settings);
+
+        /// Applied beside the struct, never through it. The ring is sized once for the maximum
+        /// latency and this only moves the fill the producer aims for inside it, so it costs no
+        /// rebuild and must not be allowed to cause one.
+        void SetLatencyMs(int milliseconds);
+
     private:
         void Refresh();
         void StartTicking();

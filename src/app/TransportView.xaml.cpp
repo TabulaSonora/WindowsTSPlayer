@@ -149,8 +149,13 @@ namespace winrt::WindowsTSPlayer::implementation
 
         // One form rather than a plural: the noun agrees with the ceiling and not with the first
         // number, so "1/64 voice" would be wrong in English and wrong in the same way elsewhere.
+        //
+        // Both numbers are padded to a fixed field. The layout no longer moves when this changes
+        // width, but the text still would: a monospaced readout whose character count varies makes
+        // the words after it jump as voices cross ten and a hundred, several times a second on a
+        // busy score. Right for the count and left for the ceiling, so the slash stays put.
         VoicesText().Text(to_hstring(
-            std::format("{}/{} voices", model_.ActiveVoices(), model_.VoiceCapacity())));
+            std::format("{:>3}/{:<3} voices", model_.ActiveVoices(), model_.VoiceCapacity())));
 
         XgBadge().Visibility(model_.XgMode() ? Visibility::Visible : Visibility::Collapsed);
 

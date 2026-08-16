@@ -93,12 +93,17 @@ if ($Register) {
     # Unregister first. Registering over an existing registration of the same version fails with
     # 0x80073CFB ("the package is already installed, and reinstallation was blocked"), and the
     # message's own suggestion -- increment the version -- is wrong for a development loop, where the
-    # version is meaningful and the layout is rebuilt dozens of times at one version. Removing the
-    # registration does not touch the files; it only drops the identity that points at them.
+    # version is meaningful and the layout is rebuilt dozens of times at one version.
+    #
+    # -PreserveApplicationData is not optional, and leaving it off is a quiet disaster rather than an
+    # inconvenience. Remove-AppxPackage deletes the package's AppData with the registration, which
+    # here is LocalFolder -- holding the imported 27 MB SCCore.dll -- and LocalSettings, holding every
+    # preference. Without it, each rebuild silently threw both away, and the symptom is an import that
+    # "will not take" rather than anything pointing at the build script.
     $existing = Get-AppxPackage -Name 'co.losno.TabulaSonoraPlayer' -ErrorAction SilentlyContinue
     if ($existing) {
-        Write-Host "    unregistering $($existing.PackageFullName)"
-        Remove-AppxPackage -Package $existing.PackageFullName -ErrorAction Stop
+        Write-Host "    unregistering $($existing.PackageFullName) (keeping app data)"
+        Remove-AppxPackage -Package $existing.PackageFullName -PreserveApplicationData -ErrorAction Stop
     }
 
     Add-AppxPackage -Register $layout
