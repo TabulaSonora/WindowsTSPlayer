@@ -54,16 +54,26 @@ jobs:
           # with nothing in front of it.
           "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
-      # vcpkg.json pins a `builtin-baseline`, which is a commit in the vcpkg repository, and the
-      # runner's clone will not have it: the baseline names whatever the machine this is developed on
-      # had checked out, and the image's copy is at some other commit entirely. vcpkg then fails with
-      # "failed to `git show` versions/baseline.json", which reads like a corrupt checkout and is
-      # really just a commit nobody fetched.
+      # vcpkg.json pins a `builtin-baseline`, and the runner's vcpkg has to be moved to it. Two
+      # separate things go wrong otherwise, and the second only appears once the first is fixed:
+      #
+      #   1. The baseline names a commit the image's clone has never seen, and vcpkg says "failed to
+      #      `git show` versions/baseline.json" -- which reads like a corrupt checkout and is only a
+      #      commit nobody fetched.
+      #   2. With it fetched but not checked out, vcpkg reads the port from the *working tree* and
+      #      looks its version up in the *baseline's* database. A runner whose ports are newer than
+      #      the baseline then fails with "no version database entry for cli11 at 2.7.2" -- the port
+      #      is fine, it is simply from a different commit than the one being asked about.
+      #
+      # Checking out the baseline settles both, and it is what pinning one is for: CI then resolves
+      # the same two libraries at the same versions this is developed against, rather than whatever
+      # the image happened to ship. Mutating the shared vcpkg is safe here because the runner is
+      # thrown away afterwards.
       #
       # The SHA is read from the manifest rather than repeated here, so there is one place to change
-      # it. A single-commit fetch is enough and is quick; the full fetch behind it is for the case
-      # where the server declines to serve an arbitrary SHA.
-      - name: Fetch the vcpkg baseline
+      # it. A single-commit fetch is quick; the full fetch behind it is for a server that declines to
+      # serve an arbitrary SHA.
+      - name: Pin vcpkg to the baseline
         shell: pwsh
         run: |
           $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
@@ -75,6 +85,8 @@ jobs:
             git -C $env:VCPKG_ROOT fetch origin
             if ($LASTEXITCODE -ne 0) { throw 'could not fetch the vcpkg baseline' }
           }
+          git -C $env:VCPKG_ROOT checkout --quiet --detach $baseline
+          if ($LASTEXITCODE -ne 0) { throw 'could not check out the vcpkg baseline' }
 
       # The `ci` preset uses Ninja rather than a Visual Studio generator, and the reason is not the
       # one it was written for. `dev` and `release` name "Visual Studio 18 2026", which was assumed
@@ -153,16 +165,26 @@ jobs:
           # with nothing in front of it.
           "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
-      # vcpkg.json pins a `builtin-baseline`, which is a commit in the vcpkg repository, and the
-      # runner's clone will not have it: the baseline names whatever the machine this is developed on
-      # had checked out, and the image's copy is at some other commit entirely. vcpkg then fails with
-      # "failed to `git show` versions/baseline.json", which reads like a corrupt checkout and is
-      # really just a commit nobody fetched.
+      # vcpkg.json pins a `builtin-baseline`, and the runner's vcpkg has to be moved to it. Two
+      # separate things go wrong otherwise, and the second only appears once the first is fixed:
+      #
+      #   1. The baseline names a commit the image's clone has never seen, and vcpkg says "failed to
+      #      `git show` versions/baseline.json" -- which reads like a corrupt checkout and is only a
+      #      commit nobody fetched.
+      #   2. With it fetched but not checked out, vcpkg reads the port from the *working tree* and
+      #      looks its version up in the *baseline's* database. A runner whose ports are newer than
+      #      the baseline then fails with "no version database entry for cli11 at 2.7.2" -- the port
+      #      is fine, it is simply from a different commit than the one being asked about.
+      #
+      # Checking out the baseline settles both, and it is what pinning one is for: CI then resolves
+      # the same two libraries at the same versions this is developed against, rather than whatever
+      # the image happened to ship. Mutating the shared vcpkg is safe here because the runner is
+      # thrown away afterwards.
       #
       # The SHA is read from the manifest rather than repeated here, so there is one place to change
-      # it. A single-commit fetch is enough and is quick; the full fetch behind it is for the case
-      # where the server declines to serve an arbitrary SHA.
-      - name: Fetch the vcpkg baseline
+      # it. A single-commit fetch is quick; the full fetch behind it is for a server that declines to
+      # serve an arbitrary SHA.
+      - name: Pin vcpkg to the baseline
         shell: pwsh
         run: |
           $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
@@ -174,6 +196,8 @@ jobs:
             git -C $env:VCPKG_ROOT fetch origin
             if ($LASTEXITCODE -ne 0) { throw 'could not fetch the vcpkg baseline' }
           }
+          git -C $env:VCPKG_ROOT checkout --quiet --detach $baseline
+          if ($LASTEXITCODE -ne 0) { throw 'could not check out the vcpkg baseline' }
 
       # The application links what CMake built, through the props file CMake generates. Building it
       # is not optional here even though this job does not test it: MSBuild reads TsguiHost props for
