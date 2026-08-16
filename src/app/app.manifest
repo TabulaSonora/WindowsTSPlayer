@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="1.0.0.0" name="WindowsTSPlayer.app" />
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <!--
+        This one line is the whole of edit (b) in the port, and it is doing more work than it looks
+        like.
+
+        src/host/ is shared by copy with the Apple and Linux front ends, and its API is std::string
+        throughout. Session::load_song opens songs with a plain std::ifstream on that string, and
+        MSVC's narrow CRT interprets it in the active code page - so without this, a song under
+        C:\Users\<a name with non-ASCII characters>\ simply fails to open, and so does the ROM,
+        which the engine reaches through CreateFileA.
+
+        Declaring UTF-8 makes every narrow Win32 and CRT call interpret its bytes as UTF-8 on
+        Windows 10 1903 and later. That fixes the host layer and the engine at once and, crucially,
+        keeps src/host/ byte-identical to the other two ports. The alternative - widening the host
+        API to std::wstring on Windows - was rejected because it would fork this directory from the
+        other two, which is exactly what the shared-by-copy arrangement cannot survive.
+      -->
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+
+      <!-- WinUI 3 renders per-monitor DPI aware. Saying so here keeps an unpackaged launch from
+           being bitmap-stretched on a scaled display, which the packaged launch would not be. -->
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 and Windows 11. -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+</assembly>

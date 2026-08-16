@@ -31,6 +31,14 @@ bin/
 Generated Files/
 packages/
 
+# The XAML compiler writes these two into the project directory rather than into "Generated Files"
+# with everything else, so they sit among the sources looking exactly like sources. They are not:
+# XamlMetaDataProvider.idl is regenerated from the .xaml on every build, and cppwinrt compiles the
+# .cpp automatically when CppWinRTOptimized is set. Committing them means the next person's build
+# either fights a stale copy or produces a diff nobody wrote.
+/src/app/XamlMetaDataProvider.idl
+/src/app/XamlMetaDataProvider.cpp
+
 # MSIX packaging and signing. A signing certificate must never be committed.
 AppPackages/
 BundleArtifacts/

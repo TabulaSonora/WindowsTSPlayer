@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="WindowsTSPlayer.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WindowsTSPlayer"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Tabula Sonora Player">
+
+    <!--
+        Deliberately unlovely. This milestone exists to prove the seam, not to look like anything:
+        that this project links tsgui_host and tabulasonora, that XAML and cppwinrt compile against
+        headers CMake generated the paths for, that a picked path survives into std::ifstream under
+        package identity, and that sound comes out. The real interface arrives later.
+    -->
+    <ScrollViewer>
+        <StackPanel Padding="24" Spacing="12">
+            <TextBlock Text="M3: the CMake / MSBuild seam"
+                       Style="{StaticResource TitleTextBlockStyle}" />
+
+            <TextBlock TextWrapping="Wrap" Opacity="0.7"
+                       Text="Load a licensed SCCore.dll, then a song. If the voice counter moves and you hear the module, the seam holds." />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="OpenRomButton"
+                        Content="Open SCCore.dll..."
+                        Click="OnOpenRomClick" />
+                <Button x:Name="OpenSongButton"
+                        Content="Open song..."
+                        IsEnabled="False"
+                        Click="OnOpenSongClick" />
+                <Button x:Name="PlayPauseButton"
+                        Content="Pause"
+                        IsEnabled="False"
+                        Click="OnPlayPauseClick" />
+            </StackPanel>
+
+            <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="No ROM loaded." />
+
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12">
+                <TextBlock x:Name="EngineText"
+                           FontFamily="Consolas"
+                           TextWrapping="Wrap"
+                           Text="engine idle" />
+            </Border>
+
+            <TextBlock x:Name="BackendText" Opacity="0.6" Text="" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

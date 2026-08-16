@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    The MSBuild half of the two-build-system seam.
+
+    CMake owns the engine and src/host/; this project owns XAML, MIDL and cppwinrt, none of which
+    CMake can drive. The direction is one-way on purpose - this file reads a props file CMake
+    generates, and CMake never invokes MSBuild - because the reverse would be a cycle neither
+    could break. See src/CMakeLists.txt, which writes the props, and build.ps1, which runs both
+    halves in the one order that works.
+  -->
+
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <!--
+    x64 only, and deliberately. vcpkg.json declares "supports": "windows & x64" for the same reason:
+    the engine is verified on one architecture here, and an arm64 configuration nobody builds is a
+    configuration nobody notices has rotted. Adding arm64 later means re-running M1's fidelity
+    check on that target, not adding a line to this file.
+  -->
+
+  <PropertyGroup Label="Globals">
+    <CppWinRTOptimized>true</CppWinRTOptimized>
+    <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+    <CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
+    <MinimalCoreWin>true</MinimalCoreWin>
+    <ProjectGuid>{A7F3C2E1-5B84-4D96-9C17-2E8B6D4A0F53}</ProjectGuid>
+    <ProjectName>WindowsTSPlayer</ProjectName>
+    <RootNamespace>WindowsTSPlayer</RootNamespace>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
+
+    <!--
+      These three lines look contradictory and are not. Together they say "a desktop process, built
+      by the Store toolchain, that is not sandboxed", which is exactly what a WinUI 3 desktop app is.
+
+      ApplicationType is what pulls in the C++ XAML build. Microsoft.Cpp.Default.props sets
+      WindowsStoreApp from it directly, WindowsStoreApp is what imports
+      Microsoft.Cpp.AppContainerApplication.props, and that props file is the only thing that points
+      _CppCommonExtensionTargets at MSBuild\Microsoft\WindowsXaml\v18.0\Microsoft.Windows.UI.Xaml.Cpp.targets.
+      Without it MarkupCompilePass1 and Pass2 never run: cppwinrt still generates MainWindow.g.h from
+      the IDL, so the build gets far enough to look healthy, and then fails on a missing
+      App.xaml.g.h and on every x:Name in the window being an undeclared identifier.
+
+      AppContainerApplication must be here and must be false, and it is not a restatement of the
+      default. Microsoft.Cpp.Default.props defaults it to *true* whenever WindowsPackageType is MSIX,
+      which is set below. Letting that stand would sandbox the process, and this program cannot be
+      sandboxed: Session::load_song opens songs with a plain std::ifstream on a raw filesystem path,
+      shared verbatim with the Apple and Linux front ends, and an AppContainer refuses that open.
+    -->
+    <AppContainerApplication>false</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+
+    <!--
+      The bill for ApplicationType, paid here.
+
+      AppContainerApplication.props also sets TargetPlatformIdentifier to UAP, from which
+      Microsoft.NuGet.targets derives NuGetTargetMoniker "UAP,Version=v10.0". NuGet, meanwhile,
+      restores any .vcxproj as "native,Version=v0.0" no matter what the project says. The two
+      disagree and the build stops with
+
+          error : Your project does not reference "UAP,Version=v10.0" framework.
+          Add a reference to "UAP,Version=v10.0" in the "TargetFrameworks" property
+
+      naming a framework nothing here ever asked for and suggesting a property that does not exist in
+      a C++ project. Pinning the moniker to what restore actually wrote is the whole fix.
+
+      Not <UseTargetPlatformAsNuGetTargetMoniker>false</UseTargetPlatformAsNuGetTargetMoniker>, which
+      is the other obvious lever and does not work: it only falls back to TargetFrameworkMoniker,
+      which by then is .NETCore,Version=v5.0 and no closer to matching.
+    -->
+    <NuGetTargetMoniker>native,Version=v0.0</NuGetTargetMoniker>
+
+    <!--
+      The second half of the same bill. With TargetPlatformIdentifier at UAP, Microsoft.NuGet.targets
+      derives a runtime identifier of win10-x64 and then insists the project restore for it:
+
+          error : Your project file doesn't list 'win10-x64' as a "RuntimeIdentifier".
+
+      For a non-UAP project it would have defaulted RuntimeIdentifiers to win;win-x86;win-x64;win-arm64
+      by itself; under UAP it defaults nothing and errors instead. Declaring the one identifier this
+      program is ever built for settles it, and matches the x64-only ProjectConfigurations above.
+    -->
+    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
+
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.19041.0</WindowsTargetPlatformMinVersion>
+
+    <!--
+      The CMake half selects its own Windows SDK and currently lands on 10.0.28000. The two halves
+      disagreeing is harmless *here* and only here: the static libraries expose nothing but our own
+      headers and the C++ standard library across the seam, so no Windows SDK type crosses it. What
+      must agree is the CRT, which is the Debug/Release mapping below, not the SDK.
+    -->
+
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+
+    <!-- Restore writes a lock file, and it is committed. Without one, "the same commit" can restore
+         different transitive package versions on two machines, and the Windows App SDK has a deep
+         dependency graph - ten sibling packages, several of which float. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'!='Debug'">false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+
+  <!--
+    Never link-time-code-generate this program, which is why WholeProgramOptimization is pinned off
+    above rather than left to the Release default. The engine's control path is 16-bit fixed point
+    and depends on wrapping, and its float-narrowing guarantees break if a*b+c is fused into an FMA.
+    /fp:precise arrives on the engine's own targets through ts::tabulasonora; LTO would let the
+    linker re-derive across that boundary anyway. Same rule as CLAUDE.md's: not a preference.
+  -->
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <!-- ============================================================================================
+       The seam.
+
+       CMake's Debug maps to MSBuild's Debug and CMake's RelWithDebInfo to MSBuild's Release, and
+       that mapping is what keeps the CRT consistent. A Debug app linking a RelWithDebInfo host
+       layer is LNK2038 _ITERATOR_DEBUG_LEVEL mismatch - the single most likely way to break this
+       build, and an error that names neither file.
+
+       The preset differs from the configuration because the CMake half also carries
+       TSGUI_FAST_DEBUG: the `dev` preset compiles the engine at /O2 while leaving our sources at
+       /Od, because at /Od the synth renders at ~1.4x realtime and no ring can absorb that.
+       ============================================================================================ -->
+  <PropertyGroup Label="TsguiSeam">
+    <TsguiCMakePreset Condition="'$(Configuration)'=='Debug'">dev</TsguiCMakePreset>
+    <TsguiCMakeConfig Condition="'$(Configuration)'=='Debug'">Debug</TsguiCMakeConfig>
+    <TsguiCMakePreset Condition="'$(Configuration)'!='Debug'">release</TsguiCMakePreset>
+    <TsguiCMakeConfig Condition="'$(Configuration)'!='Debug'">RelWithDebInfo</TsguiCMakeConfig>
+    <TsguiHostProps>$(MSBuildThisFileDirectory)..\..\build\$(TsguiCMakePreset)\TsguiHost.$(TsguiCMakeConfig).props</TsguiHostProps>
+  </PropertyGroup>
+
+  <Import Project="$(TsguiHostProps)" Condition="Exists('$(TsguiHostProps)')" />
+
+  <!--
+    Fail loudly and early rather than at link time. Running only this half is the mistake build.ps1
+    exists to prevent, and without this target the symptom is a wall of unresolved externals that
+    says nothing about the actual cause.
+  -->
+  <Target Name="TsguiRequireHostProps" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(TsguiHostProps)')"
+           Text="The CMake half has not been built for this configuration.
+
+  Missing: $(TsguiHostProps)
+
+  Run the CMake half first - or just use build.ps1, which runs both in order:
+
+      cmake --preset $(TsguiCMakePreset)
+      cmake --build --preset $(TsguiCMakePreset)
+" />
+  </Target>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <WarningLevel>Level4</WarningLevel>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+
+      <!--
+        WINRT_LEAN_AND_MEAN trims the projection headers and WIN32_LEAN_AND_MEAN trims windows.h.
+        NOMINMAX is the one that is not merely hygiene: the host layer and the engine both use
+        std::min and std::max in headers this project includes, and windows.h's macros of those names
+        would turn every one of them into a syntax error.
+      -->
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+
+      <!--
+        C4100 is unreferenced formal parameter, which every XAML event handler signature produces by
+        construction - sender and args are usually both unused. Silenced at /W4 rather than dropping
+        to /W3, so the warnings that matter stay on.
+      -->
+      <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="App.xaml.cpp">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="MainWindow.xaml.cpp">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClCompile>
+
+    <!--
+      cppwinrt generates module.g.cpp and then leaves it to the project to compile: its targets add
+      the XAML metadata provider and the C++ module interfaces to ClCompile, but never this. It
+      holds the module's activation glue, and without it the link fails on exactly two symbols,
+
+          XamlTypeInfo.g.obj : error LNK2019: unresolved external symbol WINRT_CanUnloadNow
+          XamlTypeInfo.g.obj : error LNK2019: unresolved external symbol WINRT_GetActivationFactory
+
+      referenced from the designer entry points the XAML compiler emits.
+
+      Listing a file that does not exist yet is deliberate and safe. It is written by
+      CppWinRTMakeComponentProjection, which runs well before ClCompile; MSBuild does not check that
+      a non-wildcard item exists at evaluation time, so the path resolves by the time the compiler is
+      handed it. A wildcard here would *not* work, because that is evaluated too early.
+    -->
+    <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="App.xaml.h">
+      <DependentUpon>App.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="MainWindow.xaml.h">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </ClInclude>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Midl Include="App.idl" />
+    <Midl Include="MainWindow.idl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Include="App.xaml" />
+    <Page Include="MainWindow.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="app.manifest" />
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Image Include="Assets\LockScreenLogo.png" />
+    <Image Include="Assets\SplashScreen.png" />
+    <Image Include="Assets\Square150x150Logo.png" />
+    <Image Include="Assets\Square44x44Logo.png" />
+    <Image Include="Assets\StoreLogo.png" />
+    <Image Include="Assets\Wide310x150Logo.png" />
+  </ItemGroup>
+
+  <!--
+    NOTICE.md and LICENSE ship inside the package, and this is not tidiness. The reverb and chorus
+    coefficients compiled into the engine are Roland-derived, and NativeTS requires the notice to
+    travel with any binary built from it. A package without these two files is a licensing problem,
+    not a missing nicety.
+  -->
+  <ItemGroup>
+    <Content Include="..\..\NOTICE.md">
+      <Link>NOTICE.md</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </Content>
+    <Content Include="..\..\LICENSE">
+      <Link>LICENSE</Link>
+      <DeploymentContent>true</DeploymentContent>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    Pinned to exact versions, with a committed packages.lock.json beside them. "Latest" is how a
+    build that worked yesterday stops working today for reasons no commit explains.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="[3.0.260715.1]" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="[2.4.0]" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="[10.0.28000.2526]" />
+    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="[1.0.260126.7]" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+</Project>

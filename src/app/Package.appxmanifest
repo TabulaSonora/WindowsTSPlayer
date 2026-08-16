@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <!--
+    Identity is what the file associations and the media transport controls hang off, which is why
+    this program is packaged at all rather than shipped as a loose .exe. Both of those are
+    identity-gated: an unpackaged build can play audio, but Explorer will not offer it for a .mid
+    and the now-playing flyout will not know it exists.
+
+    Publisher must match the signing certificate's subject character for character, or packaging
+    fails with APPX0104. For the development loop none of that applies - `Add-AppxPackage -Register`
+    over the loose AppX layout grants identity with no signature at all - so this stays a plain
+    development subject until there is a certificate to match.
+  -->
+  <Identity
+    Name="co.losno.TabulaSonoraPlayer"
+    Publisher="CN=TabulaSonora"
+    Version="0.1.0.0" />
+
+  <Properties>
+    <DisplayName>Tabula Sonora Player</DisplayName>
+    <PublisherDisplayName>Tabula Sonora</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application Id="App"
+      Executable="$targetnametoken$.exe"
+      EntryPoint="$targetentrypoint$">
+      <uap:VisualElements
+        DisplayName="Tabula Sonora Player"
+        Description="A front end for NativeTS, a reimplementation of the Roland Sound Canvas VA voice"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+      </uap:VisualElements>
+
+      <!--
+        File associations are deliberately absent until they are the thing being tested. This
+        milestone is proving the CMake/MSBuild seam, and an association registered by a
+        half-finished build is a shell entry that outlives the build that made it.
+      -->
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!--
+      runFullTrust is what keeps this a desktop process with the full user token rather than an
+      AppContainer, and it is a hard requirement rather than a convenience: src/host/ opens songs
+      with std::ifstream on a raw filesystem path, shared verbatim with the Apple and Linux ports.
+      Inside an AppContainer that open fails, and the alternative would be a StorageFile-based
+      reader inside src/host/ - which would fork the directory from the other two front ends.
+    -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

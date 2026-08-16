@@ -114,6 +114,39 @@ if(NOT TSGUI_USE_INSTALLED_NATIVETS)
 endif()
 
 # ---------------------------------------------------------------------------------------------
+# Debug builds that can still keep up
+#
+# At /Od the synth renders about 1.4x realtime, and no ring can absorb that -- a Debug build would
+# stutter for reasons that have nothing to do with whatever is being debugged. So the engine is
+# compiled optimised even in Debug, and only the host and application sources are not.
+#
+# This is more than one line on MSVC, unlike GCC. CMake puts both /RTC1 and /Od into the global
+# CMAKE_CXX_FLAGS_DEBUG, where neither can be removed per target; and /RTC1 with /O2 is D8016, a
+# hard error rather than a warning. So both are stripped from the global string here and /Od handed
+# back to our own targets in src/.
+#
+# **This must come before the engine's add_subdirectory below, and that is not a stylistic
+# preference.** A subdirectory takes a copy of the parent's variables at the moment it is added, so a
+# strip written after it silently does nothing to the engine's targets -- they keep the /RTC1 they
+# inherited, collide with the /O2 added further down, and the build dies with
+#
+#     cl : command line error D8016: '/O2' and '/RTC1' command-line options are incompatible
+#
+# naming neither this file nor the ordering that caused it. Nothing catches this in a Release build,
+# because /RTC1 only exists in Debug.
+#
+# Note what this does *not* fix: /O2 leaves _ITERATOR_DEBUG_LEVEL=2 in place, which bounds-checks
+# every std::vector and std::span access in the DSP inner loops. Changing that is an ABI change and
+# would break linking against everything else built Debug, so it is not an option. If a Debug build
+# still cannot keep up, the answer is a preset whose CMake half is RelWithDebInfo -- losing
+# step-through of the host layer -- not a CRT flag.
+# ---------------------------------------------------------------------------------------------
+if(TSGUI_FAST_DEBUG AND MSVC)
+    string(REGEX REPLACE "/RTC[1csu]+" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+    string(REGEX REPLACE "/Od" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+endif()
+
+# ---------------------------------------------------------------------------------------------
 # The engine
 # ---------------------------------------------------------------------------------------------
 if(TSGUI_USE_INSTALLED_NATIVETS)
@@ -141,29 +174,8 @@ else()
     unset(CMAKE_DISABLE_FIND_PACKAGE_PkgConfig)
 endif()
 
-# ---------------------------------------------------------------------------------------------
-# Debug builds that can still keep up
-#
-# At /Od the synth renders about 1.4x realtime, and no ring can absorb that -- a Debug build would
-# stutter for reasons that have nothing to do with whatever is being debugged. So the engine is
-# compiled optimised even in Debug, and only the host and application sources are not.
-#
-# This is more than one line on MSVC, unlike GCC. CMake puts both /RTC1 and /Od into the global
-# CMAKE_CXX_FLAGS_DEBUG, where neither can be removed per target; and /RTC1 with /O2 is D8016, a
-# hard error rather than a warning. So both are stripped from the global string here and /Od handed
-# back to our own targets in src/.
-#
-# Note what this does *not* fix: /O2 leaves _ITERATOR_DEBUG_LEVEL=2 in place, which bounds-checks
-# every std::vector and std::span access in the DSP inner loops. Changing that is an ABI change and
-# would break linking against everything else built Debug, so it is not an option. If a Debug build
-# still cannot keep up, the answer is a preset whose CMake half is RelWithDebInfo -- losing
-# step-through of the host layer -- not a CRT flag.
-# ---------------------------------------------------------------------------------------------
-if(TSGUI_FAST_DEBUG AND MSVC)
-    string(REGEX REPLACE "/RTC[1csu]+" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-    string(REGEX REPLACE "/Od" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
-endif()
-
+# The other half of the block above: the engine's target exists only now, so the /O2 that replaces
+# what was just stripped has to be added here.
 if(TSGUI_FAST_DEBUG AND TARGET tabulasonora)
     target_compile_options(tabulasonora PRIVATE
         $<$<CONFIG:Debug>:$<IF:$<CXX_COMPILER_ID:MSVC>,/O2,-O2>>)

@@ -1,0 +1,26 @@
+// Deliberately empty, and the emptiness is the point.
+//
+// App is generated entirely from App.xaml: the XAML compiler emits App.xaml.g.h with the AppT<App>
+// base, and nothing ever activates the class across an ABI, so it has no business in Windows
+// metadata. Declaring it here as
+//
+//     runtimeclass App : Microsoft.UI.Xaml.Application { App(); }
+//
+// fails two ways over. MIDL rejects it outright, because a runtimeclass whose only member is a
+// constructor has no members to put on an interface:
+//
+//     error MIDL5053: empty runtime class cannot have the [composable] or [activatable] attribute
+//
+// and adding [default_interface] to satisfy that only moves the failure: App then appears in the
+// generated module.g.cpp, which calls winrt_make_WindowsTSPlayer_App() and so requires a
+// factory_implementation::App that the XAML-generated headers do not define.
+//
+// MainWindow.idl is the contrasting case and does declare its class, because a Window genuinely is
+// activated by name.
+//
+// The file itself stays, rather than being deleted, because the project references it and because
+// the moment App grows anything projected, this is where it goes.
+
+namespace WindowsTSPlayer
+{
+}

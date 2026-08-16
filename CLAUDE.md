@@ -40,8 +40,12 @@ cmake --preset dev                 # Debug app over an /O2 engine
 cmake --build --preset dev
 msbuild src\app\WindowsTSPlayer.vcxproj -t:Restore -p:Configuration=Debug -p:Platform=x64
 msbuild src\app\WindowsTSPlayer.vcxproj -p:Configuration=Debug -p:Platform=x64
-Add-AppxPackage -Register src\app\bin\x64\Debug\AppX\AppxManifest.xml
+Add-AppxPackage -Register src\app\x64\Debug\WindowsTSPlayer\AppxManifest.xml
 ```
+
+The loose layout is the output directory itself — `AppxManifest.xml`, `resources.pri` and the
+compiled `.xbf` land beside the `.exe`. There is no `AppX\` subdirectory; that belongs to the
+separate-packaging-project flow this repository does not use.
 
 `build.ps1` runs both halves in order. **Running only the MSBuild half links a stale engine**, which
 is the failure this wrapper exists to prevent.
@@ -65,7 +69,12 @@ Two ROM environment variables, and they are not the same one:
 `TSGUI_FAST_DEBUG` is not a one-line option on MSVC. `/RTC1` and `/O2` are mutually exclusive and
 produce `D8016`, a hard error, and both `/RTC1` and `/Od` arrive in the global `CMAKE_CXX_FLAGS_DEBUG`
 where they cannot be removed per target. They are stripped globally and `/Od` handed back to the
-application-side targets. Note `/O2` does **not** remove `_ITERATOR_DEBUG_LEVEL=2`, which
+application-side targets. **The strip must precede the engine's `add_subdirectory`** — a
+subdirectory copies the parent's variables when it is added, so stripping afterwards leaves the
+engine's own targets with the `/RTC1` they inherited and the build dies with `D8016` naming neither
+cause nor file. Release never shows it, because `/RTC1` exists only in Debug.
+
+Note `/O2` does **not** remove `_ITERATOR_DEBUG_LEVEL=2`, which
 bounds-checks every `std::vector`/`std::span` access in the DSP inner loops; changing that is an ABI
 change and would break linking, so if a Debug build is too slow the answer is a `RelWithDebInfo`
 CMake half, not a CRT flag.
@@ -80,6 +89,27 @@ The Debug↔`dev` / Release↔`release` mapping in the `.vcxproj` is what keeps 
 Mixing them gives `LNK2038 _ITERATOR_DEBUG_LEVEL mismatch`. The vcpkg triplet is
 `x64-windows-static-md` for the same reason: static third-party libraries over the dynamic CRT the
 Windows App SDK requires.
+
+Four settings in `WindowsTSPlayer.vcxproj` look removable and are not. Each is commented at the site
+with the error it causes; the short version:
+
+- **`ApplicationType=Windows Store`** is what a WinUI 3 *desktop* app needs, counter-intuitively. It
+  sets `WindowsStoreApp`, which imports `Microsoft.Cpp.AppContainerApplication.props`, which is the
+  only thing that points at the C++ XAML targets. Remove it and `MarkupCompilePass1`/`Pass2` never
+  run — cppwinrt still emits `MainWindow.g.h`, so the failure surfaces as a missing `App.xaml.g.h`
+  and every `x:Name` being an undeclared identifier.
+- **`NuGetTargetMoniker` and `RuntimeIdentifiers`** pay for that: the same props sets
+  `TargetPlatformIdentifier=UAP`, so NuGet demands `UAP,Version=v10.0` and `win10-x64` while
+  restoring any `.vcxproj` as `native,Version=v0.0` regardless.
+- **`AppContainerApplication=false`** is not a restatement of the default. `WindowsPackageType=MSIX`
+  defaults it to *true*, and an AppContainer refuses `Session::load_song`'s `std::ifstream` on a raw
+  path — which is the whole reason `src/host/` can stay identical to the other two ports.
+- **`module.g.cpp` is listed in `ClCompile` by hand.** cppwinrt generates it and its own targets
+  never compile it; without it the link fails on `WINRT_CanUnloadNow` and `WINRT_GetActivationFactory`.
+
+`App` is deliberately absent from `App.idl`. Declaring it puts it in `module.g.cpp`, which then wants
+a `factory_implementation::App` the XAML-generated headers do not define. `MainWindow` is the
+opposite case and must be declared.
 
 ## Testing
 
