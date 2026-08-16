@@ -104,15 +104,9 @@ namespace winrt::WindowsTSPlayer::implementation
 
         updating_ = true;
 
-        const hstring song = model_.SongName();
-        const hstring rom = model_.RomName();
-        const bool hasSong = !song.empty();
-
-        TitleText().Text(hasSong ? song : hstring{ L"No file open" });
-        SubtitleText().Text(rom.empty()
-                                ? hstring{}
-                                : to_hstring(std::format("Sound Canvas voice \xC2\xB7 {}",
-                                                         to_string(rom))));
+        // The song's name and the ROM's are not read here any more. They are the window title bar's
+        // to show, and the transport keeps only what changes while a song plays.
+        const bool hasSong = !model_.SongName().empty();
 
         const double duration = model_.Duration();
 

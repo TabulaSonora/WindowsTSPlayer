@@ -12,11 +12,21 @@ namespace tsgui
     /// caption-inset arithmetic below is the sort of thing that gets fixed in one copy and not the
     /// other.
     ///
-    /// `titleBarArea` is the element the window draws its own title into. It is handed to
-    /// `SetTitleBar`, so it becomes the region that drags the window, and it is given left and right
-    /// padding matching the system's own insets.
+    /// `strip` is the whole top row the window draws for itself. It receives left and right padding
+    /// matching the system's insets, so whatever it holds stays clear of the caption buttons.
+    ///
+    /// `dragRegion` is the part of that strip which drags the window, and it is a separate argument
+    /// because **interactive content inside a SetTitleBar element does not receive input.** A window
+    /// whose strip carries nothing but a label passes the strip for both. One that puts a command bar
+    /// up there must pass only the inert part, or every button in the strip becomes a place to pick
+    /// the window up by.
+    ///
+    /// `tall` asks the system for the 48px caption. Worth it when the strip carries two lines of
+    /// text: without it the caption buttons stay 32px tall in a taller strip and sit visibly high.
     void SetUpWindowChrome(winrt::Microsoft::UI::Xaml::Window const& window,
-                           winrt::Microsoft::UI::Xaml::Controls::Grid const& titleBarArea);
+                           winrt::Microsoft::UI::Xaml::Controls::Grid const& strip,
+                           winrt::Microsoft::UI::Xaml::UIElement const& dragRegion,
+                           bool tall);
 
     /// A window's size, and whether it is showing that size or filling the screen.
     struct WindowGeometry

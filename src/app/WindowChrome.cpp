@@ -34,7 +34,8 @@ void Reserve(Microsoft::UI::Windowing::AppWindow const& window, Grid const& area
 
 namespace tsgui
 {
-    void SetUpWindowChrome(Window const& window, Grid const& titleBarArea)
+    void SetUpWindowChrome(Window const& window, Grid const& strip, UIElement const& dragRegion,
+                           bool tall)
     {
         // Mica Alt as the base, with content raised onto translucent layers above it.
         //
@@ -65,9 +66,14 @@ namespace tsgui
         // so the material would stop at a hard edge an inch below the top of the window - which reads
         // as the backdrop being broken rather than as a caption doing its job.
         window.ExtendsContentIntoTitleBar(true);
-        window.SetTitleBar(titleBarArea);
+        window.SetTitleBar(dragRegion);
 
         auto appWindow = window.AppWindow();
+
+        if (tall) {
+            appWindow.TitleBar().PreferredHeightOption(
+                Microsoft::UI::Windowing::TitleBarHeightOption::Tall);
+        }
 
         // AppWindow::Changed, not a title-bar event: AppWindowTitleBar has none. The UWP type had
         // LayoutMetricsChanged and the Windowing one does not, so the insets are re-read whenever the
@@ -78,14 +84,14 @@ namespace tsgui
         // either strongly would hang a reference off the AppWindow that points back at the tree the
         // AppWindow belongs to, and a window that cannot drop its last reference is a window that
         // never finishes closing.
-        auto weakArea = make_weak(titleBarArea);
+        auto weakArea = make_weak(strip);
         appWindow.Changed([weakArea](Microsoft::UI::Windowing::AppWindow const& sender, auto&&) {
             if (auto area = weakArea.get()) {
                 Reserve(sender, area);
             }
         });
 
-        Reserve(appWindow, titleBarArea);
+        Reserve(appWindow, strip);
     }
 
     void RestoreWindowGeometry(Window const& window, int width, int height, bool maximized)

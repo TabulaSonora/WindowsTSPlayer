@@ -23,64 +23,156 @@
     <Grid x:Name="RootGrid" RowSpacing="12" AllowDrop="True"
           DragOver="OnDragOver" Drop="OnDrop">
         <Grid.RowDefinitions>
-            <RowDefinition Height="32" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="48" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <!--
-            The title bar, drawn by the app rather than by the system.
+            One strip, doing three jobs: it is the title bar, it carries the commands, and it says
+            what is loaded.
 
-            Extending into it is not decoration here: it is what makes the backdrop continuous. Left
-            to the system, the caption strip is painted its own solid colour and the Mica stops at a
-            hard edge an inch below the top of the window, which reads as a bug.
+            They were three rows and the merge is a real simplification rather than a rearrangement.
+            The caption said the program's name, which the taskbar and Alt-Tab already say; the
+            command bar's status line said the ROM; and the transport's heading said the song and the
+            ROM again. Two of those were the same sentence in two places, and the third was a constant.
 
-            The height is the caption height, and the right-hand padding in code keeps this clear of
-            the minimise, maximise and close buttons - whose width is not a constant and has to be
-            asked for.
+            Extending into the caption is what makes the backdrop continuous. Left to the system, that
+            strip is painted its own solid colour and the Mica stops at a hard edge an inch below the
+            top of the window, which reads as a bug.
+
+            48 tall, with the system asked for its matching tall caption in code. At the standard 32
+            there is no room for a second line, and the two lines are the point: the song is the
+            heading and what it is playing on is the note under it.
         -->
         <Grid x:Name="TitleBarArea" Grid.Row="0">
-            <TextBlock x:Name="TitleBarText"
-                       Text="Tabula Sonora Player"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       VerticalAlignment="Center"
-                       Margin="16,0,0,0" />
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!--
+                The draggable half, and it is a separate element from the strip for a reason that is
+                not stylistic: interactive content inside a SetTitleBar region does not receive input.
+                Handing the whole strip over would turn every command in it into a place to pick the
+                window up by. So only this column is the title bar; the command bar beside it is
+                ordinary content.
+
+                Starred, so the empty space between the text and the commands drags too. A title bar
+                that can only be grabbed by its lettering is one people miss.
+            -->
+            <Grid x:Name="TitleDragArea" Grid.Column="0">
+                <StackPanel Margin="16,0,12,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="TitleBarText"
+                               Text="Tabula Sonora Player"
+                               Style="{StaticResource BodyStrongTextBlockStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                    <!--
+                        One line for two jobs, and they take turns rather than sharing: normally it
+                        says what the file is being played on, and while something is happening or has
+                        failed it says that instead. Two lines would leave one of them blank almost
+                        always.
+                    -->
+                    <TextBlock x:Name="StatusText"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Opacity="0.7"
+                               TextTrimming="CharacterEllipsis"
+                               Text="No ROM loaded." />
+                </StackPanel>
+            </Grid>
+
+            <!--
+                The commands.
+
+                Background explicitly transparent, which is load-bearing rather than tidy: a CommandBar
+                paints its own surface by default, and an opaque block up here would cut the Mica
+                exactly where extending into the title bar has just made it whole.
+
+                DefaultLabelPosition is Right, not the default Bottom. Bottom stacks the label under
+                the icon and needs about seventy pixels; every one of them would come out of the mixer,
+                which exists to fit all sixteen parts of a GM score on screen at once. Labels beside
+                icons keep this to the one line the caption already occupies, which is the whole reason
+                the three rows collapse into one.
+
+                Labels at all, rather than icons alone. Half of these are irreversible or slow - an
+                export runs for minutes - and a glyph with a tooltip is not enough to tell them apart
+                at a glance.
+            -->
+            <CommandBar Grid.Column="1"
+                        Background="Transparent"
+                        DefaultLabelPosition="Right"
+                        IsOpen="False"
+                        OverflowButtonVisibility="Auto"
+                        VerticalAlignment="Center">
+
+                <!--
+                    Importing is a first-run step and this hides once there is a ROM, so it stays a
+                    primary command rather than going to the overflow: the one run where it matters is
+                    the run where nothing else on this bar is enabled yet, and burying it behind an
+                    ellipsis on that run would be the worst possible placement.
+                -->
+                <AppBarButton x:Name="OpenRomButton" Label="Import SCCore.dll" Click="OnOpenRomClick">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE8B5;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+
+                <AppBarButton x:Name="OpenSongButton" Label="Open song" IsEnabled="False" Click="OnOpenSongClick">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE8E5;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+
+                <!--
+                    Recent songs, as a button that only opens a flyout. Not a SplitButton: its primary
+                    half would have to mean "open the most recent one", and a control whose click
+                    target does something different from its arrow is how people open the wrong file.
+                -->
+                <AppBarButton x:Name="RecentButton" Label="Recent" IsEnabled="False">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </AppBarButton.Icon>
+                    <AppBarButton.Flyout>
+                        <MenuFlyout x:Name="RecentFlyout" Placement="Bottom" />
+                    </AppBarButton.Flyout>
+                </AppBarButton>
+
+                <AppBarSeparator />
+
+                <!--
+                    Song information, in a window of its own rather than a flyout or a dialog. What a
+                    file says about itself runs to three pages, and reading the credits of a piece
+                    while it plays is the case it exists for - which a modal dialog would prevent.
+                -->
+                <AppBarButton x:Name="SongInfoButton" Label="Song info" IsEnabled="False" Click="OnSongInfoClick">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE946;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+
+                <AppBarButton x:Name="ExportButton" Label="Export WAV" IsEnabled="False" Click="OnExportClick">
+                    <AppBarButton.Icon>
+                        <FontIcon Glyph="&#xE792;" />
+                    </AppBarButton.Icon>
+                </AppBarButton>
+
+                <!--
+                    Preferences goes to the overflow, which is where Windows has put it for a decade.
+                    It is the one command here that is never part of playing a file, and the only one
+                    whose absence from the visible row costs nothing.
+                -->
+                <CommandBar.SecondaryCommands>
+                    <AppBarButton x:Name="PrefsButton" Label="Preferences" Click="OnPrefsClick">
+                        <AppBarButton.Icon>
+                            <FontIcon Glyph="&#xE713;" />
+                        </AppBarButton.Icon>
+                    </AppBarButton>
+                </CommandBar.SecondaryCommands>
+            </CommandBar>
         </Grid>
 
-        <!--
-            Opening files still lives on a row of buttons. The menu, the drag target and the
-            recent-files list arrive with the settings milestone; until then this is what puts a ROM
-            and a song into the model.
-        -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="16,0">
-            <Button x:Name="OpenRomButton" Content="Import SCCore.dll..." Click="OnOpenRomClick" />
-            <Button x:Name="OpenSongButton" Content="Open song..." IsEnabled="False" Click="OnOpenSongClick" />
 
-            <!--
-                Recent songs. A DropDownButton rather than a SplitButton: its primary half would have
-                to mean "open the most recent one", and a button whose click target does something
-                different from its arrow is how people open the wrong file.
-            -->
-            <DropDownButton x:Name="RecentButton" Content="Recent" IsEnabled="False">
-                <DropDownButton.Flyout>
-                    <MenuFlyout x:Name="RecentFlyout" Placement="Bottom" />
-                </DropDownButton.Flyout>
-            </DropDownButton>
-
-            <!--
-                Song information, in a window of its own rather than a flyout or a dialog. What a
-                file says about itself runs to three pages, and reading the credits of a piece while
-                it plays is the case it exists for - which a modal dialog would make impossible.
-            -->
-            <Button x:Name="SongInfoButton" Content="Song info..." IsEnabled="False" Click="OnSongInfoClick" />
-
-            <Button x:Name="ExportButton" Content="Export WAV..." IsEnabled="False" Click="OnExportClick" />
-            <Button x:Name="PrefsButton" Content="Preferences..." Click="OnPrefsClick" />
-            <TextBlock x:Name="StatusText" VerticalAlignment="Center" Opacity="0.7" TextTrimming="CharacterEllipsis" Text="No ROM loaded." />
-        </StackPanel>
-
-        <StackPanel Grid.Row="2" Spacing="6" Margin="16,0">
+        <StackPanel Grid.Row="1" Spacing="6" Margin="16,0">
             <local:TransportView x:Name="Transport" />
             <TextBlock x:Name="ChurnText" FontFamily="Consolas" Opacity="0.5" FontSize="11" Text="" />
         </StackPanel>
@@ -104,7 +196,7 @@
             each end. So the bottom border and the bottom corners go - they would be sitting on the
             window's own rounded edge - and only the top corners stay rounded.
         -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="2"
                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1,1,1,0"

@@ -584,7 +584,10 @@ namespace tsgui
         // painting over it.
         window.Content(root);
 
-        SetUpWindowChrome(window, titleBarArea);
+        // The strip and the drag region are the same element here: this window puts nothing
+        // interactive in its title bar, so there is nothing that handing the whole thing over would
+        // stop from working. Standard height rather than tall, because it carries one line.
+        SetUpWindowChrome(window, titleBarArea, titleBarArea, false);
         SetWindowIcon(window);
 
         // Remembered separately from the player's, under its own keys. The two are different shapes --

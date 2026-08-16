@@ -48,6 +48,11 @@ namespace winrt::WindowsTSPlayer::implementation
         /// Turns whatever the store now holds into engine settings, in one call.
         void ApplySettings();
 
+        /// Writes the title bar's two lines from the model: the song above, what it is playing on
+        /// below. The lower line is shared with transient status, so this is also how the strip
+        /// returns to saying something true once a message has been shown there.
+        void SyncHeading();
+
         /// Copies a chosen SCCore.dll into the application's own storage and loads it from there.
         winrt::fire_and_forget ImportRom(Windows::Storage::StorageFile file);
 
@@ -86,6 +91,11 @@ namespace winrt::WindowsTSPlayer::implementation
 
         /// A song named before there was a ROM to play it on. Empty the rest of the time.
         hstring pendingSong_;
+
+        /// The two subscriptions this window holds on the model, kept so they can be dropped when it
+        /// closes. Both handlers reach back through a bare `this`.
+        winrt::event_token propertyToken_{};
+        winrt::event_token vectorToken_{};
 
         /// The song information window, while one is open.
         ///

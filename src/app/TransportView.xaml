@@ -8,16 +8,13 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
+    <!--
+        No heading. The song's name and what it is playing on used to sit here, and they now live in
+        the window's title bar - which the caption, the commands and the status line share. That was
+        not a move for its own sake: the transport's heading and the command bar's status line were
+        saying the same thing about the same ROM, one above the other.
+    -->
     <StackPanel Spacing="8">
-
-        <!-- Heading -->
-        <StackPanel Spacing="2">
-            <TextBlock x:Name="TitleText"
-                       Style="{StaticResource SubtitleTextBlockStyle}"
-                       TextTrimming="CharacterEllipsis"
-                       Text="No file open" />
-            <TextBlock x:Name="SubtitleText" Opacity="0.6" Text="" />
-        </StackPanel>
 
         <!-- Scrubber -->
         <Grid ColumnSpacing="8">

@@ -66,15 +66,26 @@ namespace winrt::WindowsTSPlayer::implementation
         // with a system-drawn caption beside a first with a drawn one does not read as one program.
         const auto window = try_as<Window>();
         tsgui::SetWindowIcon(window);
-        tsgui::SetUpWindowChrome(window, TitleBarArea());
+        tsgui::SetUpWindowChrome(window, TitleBarArea(), TitleDragArea(), true);
 
         RestoreWindowGeometry();
 
         Transport().Model(model_);
         Mixer().Model(model_);
 
-        model_.PropertyChanged({ this, &MainWindow::OnModelPropertyChanged });
-        model_.VisibleParts().VectorChanged([this](auto&&, auto&&) { ++listChanges_; });
+        // Both tokens are kept, because both of these handlers hold a bare `this`. A C++/WinRT
+        // delegate built from `{ this, &Method }` stores a raw pointer and not a reference, so a
+        // subscription left in place after the window has gone is a call through a dangling pointer
+        // rather than a harmless no-op -- which is precisely what faulted the process on exit.
+        //
+        // The obvious hardening, `{ get_weak(), &Method }`, is **not available here** and the failure
+        // is a wall of template errors in base.h rather than anything naming the cause: a Window
+        // implementation derives through a composable base, and the weak-reference support
+        // winrt::implements gives an ordinary runtimeclass does not reach it. Revoking below is
+        // therefore the whole of the defence rather than the second half of one, which is worth
+        // knowing before anyone deletes it as redundant.
+        propertyToken_ = model_.PropertyChanged({ this, &MainWindow::OnModelPropertyChanged });
+        vectorToken_ = model_.VisibleParts().VectorChanged([this](auto&&, auto&&) { ++listChanges_; });
 
         // One handler, one rebuild. N keys changed in the preferences cost one pass through the
         // engine rather than N, which is the whole reason the store hands over a struct.
@@ -100,9 +111,23 @@ namespace winrt::WindowsTSPlayer::implementation
                 songInfoWindow_ = nullptr;
             }
 
-            // Dropping the last reference stops the tick and the device: the model's destructor owns
-            // that teardown, and leaving it to process exit would let the render thread and the
-            // WASAPI feeder outlive the XAML tree they are publishing into.
+            // Unsubscribed before anything else, because both handlers reach this window through a
+            // raw pointer and this window is about to stop existing.
+            model_.PropertyChanged(propertyToken_);
+            model_.VisibleParts().VectorChanged(vectorToken_);
+
+            // Told to stop, rather than left to stop when its last reference goes.
+            //
+            // **This window is not the model's last owner**, and believing it was is what made the
+            // program fault on the way out. Every mixer strip holds the model too, and those live
+            // until the list containing them is collected -- so clearing the three references below
+            // and expecting the destructor to run was expecting the wrong thing. The model stayed
+            // alive with its 100 ms tick still going, publishing into a window that was already being
+            // torn down, and the process died with an access violation just as it closed. The only
+            // visible symptom was the cursor showing busy for a moment: the window was gone by then,
+            // so there was nothing left to look wrong.
+            get_self<implementation::PlayerModel>(model_)->Shutdown();
+
             Transport().Model(nullptr);
             Mixer().Model(nullptr);
             model_ = nullptr;
@@ -192,10 +217,30 @@ namespace winrt::WindowsTSPlayer::implementation
         return hwnd;
     }
 
+    void MainWindow::SyncHeading()
+    {
+        // What the title bar says when nothing else is being reported. The program's own name is the
+        // fallback rather than the constant it used to be: with a song open, the taskbar button and
+        // Alt-Tab already carry the name, and the strip's one line of heading is better spent on
+        // which file this is.
+        const hstring song = model_.SongName();
+        TitleBarText().Text(song.empty() ? hstring{ L"Tabula Sonora Player" } : song);
+
+        const hstring rom = model_.RomName();
+        StatusText().Text(rom.empty()
+                              ? hstring{ L"No ROM loaded." }
+                              : to_hstring(std::format("Sound Canvas voice \xC2\xB7 {}",
+                                                       to_string(rom))));
+    }
+
     void MainWindow::OnModelPropertyChanged(IInspectable const&,
                                             Data::PropertyChangedEventArgs const& args)
     {
         const hstring name = args.PropertyName();
+
+        if (name == L"SongName" || name == L"RomName") {
+            SyncHeading();
+        }
 
         if (name == L"Position") {
             ++updates_;
@@ -274,7 +319,7 @@ namespace winrt::WindowsTSPlayer::implementation
 
         settings_->set_rom_verified(true);
         ShowRomImport(false);
-        StatusText().Text(model_.RomName());
+        SyncHeading();
         OpenSongButton().IsEnabled(true);
         RecentButton().IsEnabled(true);
 
@@ -316,7 +361,7 @@ namespace winrt::WindowsTSPlayer::implementation
 
         settings_->set_rom_verified(true);
         ShowRomImport(false);
-        StatusText().Text(model_.RomName());
+        SyncHeading();
         OpenSongButton().IsEnabled(true);
         RecentButton().IsEnabled(true);
 
@@ -363,7 +408,7 @@ namespace winrt::WindowsTSPlayer::implementation
             co_return false;
         }
 
-        StatusText().Text(model_.RomName());
+        SyncHeading();
         ExportButton().IsEnabled(true);
         SongInfoButton().IsEnabled(true);
 
@@ -577,6 +622,10 @@ namespace winrt::WindowsTSPlayer::implementation
         const bool ok = co_await model_.ExportWavAsync(file.Path());
 
         ExportButton().IsEnabled(true);
-        StatusText().Text(ok ? model_.RomName() : model_.LastError());
+        if (ok) {
+            SyncHeading();
+        } else {
+            StatusText().Text(model_.LastError());
+        }
     }
 }

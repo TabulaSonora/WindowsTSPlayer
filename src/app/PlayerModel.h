@@ -109,6 +109,18 @@ namespace winrt::WindowsTSPlayer::implementation
         /// rebuild and must not be allowed to cause one.
         void SetLatencyMs(int milliseconds);
 
+        /// Stops the tick and the audio device, now, rather than whenever the last reference happens
+        /// to go.
+        ///
+        /// **The destructor is not a safe place to rely on for this, and assuming it was is what made
+        /// the program fault on exit.** The window is not the model's only owner -- every mixer strip
+        /// holds one too, and those live until the list that contains them is collected -- so a window
+        /// that merely dropped its reference left the model alive with its 100 ms timer still running,
+        /// publishing property changes into a window in the middle of being destroyed.
+        ///
+        /// Idempotent, so the destructor can call it as well without caring whether this already has.
+        void Shutdown();
+
     private:
         void Refresh();
         void StartTicking();

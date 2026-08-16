@@ -55,8 +55,18 @@ namespace winrt::WindowsTSPlayer::implementation
     // keeping the engine's headers out of the header is the point of forward-declaring them.
     PlayerModel::~PlayerModel()
     {
+        Shutdown();
+    }
+
+    void PlayerModel::Shutdown()
+    {
         if (timer_) {
             timer_.Stop();
+
+            // Released as well as stopped. A stopped timer still holds the Tick handler, and that
+            // handler holds a bare `this` -- which is correct while the model is alive and is exactly
+            // the sort of thing that should not be left lying about once it has been told to stop.
+            timer_ = nullptr;
         }
         if (device_) {
             device_->stop();
