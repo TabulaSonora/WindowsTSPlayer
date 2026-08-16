@@ -54,6 +54,28 @@ jobs:
           # with nothing in front of it.
           "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 
+      # vcpkg.json pins a `builtin-baseline`, which is a commit in the vcpkg repository, and the
+      # runner's clone will not have it: the baseline names whatever the machine this is developed on
+      # had checked out, and the image's copy is at some other commit entirely. vcpkg then fails with
+      # "failed to `git show` versions/baseline.json", which reads like a corrupt checkout and is
+      # really just a commit nobody fetched.
+      #
+      # The SHA is read from the manifest rather than repeated here, so there is one place to change
+      # it. A single-commit fetch is enough and is quick; the full fetch behind it is for the case
+      # where the server declines to serve an arbitrary SHA.
+      - name: Fetch the vcpkg baseline
+        shell: pwsh
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          if (-not $baseline) { throw 'vcpkg.json has no builtin-baseline' }
+          Write-Host "baseline: $baseline"
+          git -C $env:VCPKG_ROOT fetch --depth 1 origin $baseline
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'single-commit fetch refused; fetching the whole history'
+            git -C $env:VCPKG_ROOT fetch origin
+            if ($LASTEXITCODE -ne 0) { throw 'could not fetch the vcpkg baseline' }
+          }
+
       # The `ci` preset uses Ninja rather than a Visual Studio generator, and the reason is not the
       # one it was written for. `dev` and `release` name "Visual Studio 18 2026", which was assumed
       # to exist on no runner -- and windows-latest turns out to carry exactly that, Enterprise, with
@@ -130,6 +152,28 @@ jobs:
           # through empty. The symptom is a toolchain file at "/scripts/buildsystems/vcpkg.cmake"
           # with nothing in front of it.
           "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      # vcpkg.json pins a `builtin-baseline`, which is a commit in the vcpkg repository, and the
+      # runner's clone will not have it: the baseline names whatever the machine this is developed on
+      # had checked out, and the image's copy is at some other commit entirely. vcpkg then fails with
+      # "failed to `git show` versions/baseline.json", which reads like a corrupt checkout and is
+      # really just a commit nobody fetched.
+      #
+      # The SHA is read from the manifest rather than repeated here, so there is one place to change
+      # it. A single-commit fetch is enough and is quick; the full fetch behind it is for the case
+      # where the server declines to serve an arbitrary SHA.
+      - name: Fetch the vcpkg baseline
+        shell: pwsh
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          if (-not $baseline) { throw 'vcpkg.json has no builtin-baseline' }
+          Write-Host "baseline: $baseline"
+          git -C $env:VCPKG_ROOT fetch --depth 1 origin $baseline
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'single-commit fetch refused; fetching the whole history'
+            git -C $env:VCPKG_ROOT fetch origin
+            if ($LASTEXITCODE -ne 0) { throw 'could not fetch the vcpkg baseline' }
+          }
 
       # The application links what CMake built, through the props file CMake generates. Building it
       # is not optional here even though this job does not test it: MSBuild reads TsguiHost props for
