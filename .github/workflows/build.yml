@@ -46,13 +46,21 @@ jobs:
             }
           }
 
-      # The `ci` preset uses Ninja rather than a Visual Studio generator. The `dev` and `release`
-      # presets name "Visual Studio 18 2026", which is correct on the machine this is written on and
-      # exists on no runner; Ninja takes whichever cl.exe the step above put on PATH and so has no
-      # year baked into it.
+          # VCPKG_ROOT is what the presets read; the runner calls the same thing
+          # VCPKG_INSTALLATION_ROOT. Copied here rather than through `${{ env.X }}` in a step's env
+          # block, which does not work and does not complain: that expression reads the workflow's
+          # own env map, not the runner's process environment, so a variable the image exports comes
+          # through empty. The symptom is a toolchain file at "/scripts/buildsystems/vcpkg.cmake"
+          # with nothing in front of it.
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
+      # The `ci` preset uses Ninja rather than a Visual Studio generator, and the reason is not the
+      # one it was written for. `dev` and `release` name "Visual Studio 18 2026", which was assumed
+      # to exist on no runner -- and windows-latest turns out to carry exactly that, Enterprise, with
+      # MSVC 14.51. So the named generator would in fact work today. Ninja stays because it does not
+      # depend on that staying true: it takes whichever cl.exe the step above put on PATH, and it is
+      # single-config, so the build type is decided at configure time rather than argued about twice.
       - name: Configure
-        env:
-          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
         run: cmake --preset ci
 
       - name: Build
@@ -79,14 +87,18 @@ jobs:
     # is developed against. A failure here means the runner needs different arguments; a failure
     # above means something is wrong with the program.
     #
-    # The dependency is sharper than "a recent Visual Studio", and it was worth finding out by hand
-    # rather than by three red runs. Building with -p:PlatformToolset=v143 on the development machine
-    # fails with MSB8020 -- "the build tools for 'v143' application Type UWP cannot be found" --
-    # even though that toolset's compiler is installed. ApplicationType is `Windows Store`, which this
-    # project needs and cannot drop (see the comment on it in the .vcxproj), and that pulls in the
-    # Universal Windows Platform build tools *for the chosen toolset* rather than the compiler alone.
-    # So what this job actually requires from a runner image is the UWP C++ component matching
-    # whatever PlatformToolset it is given.
+    # No PlatformToolset is passed, and that is a correction rather than an omission. This job first
+    # forced v143 on the assumption that a runner would be years behind; windows-latest is in fact
+    # Visual Studio 18 2026 Enterprise, so the project's own v145 default is both available and
+    # right, and asking for an older toolset was inventing a requirement the image need not meet.
+    #
+    # What it does require is narrower than a version number, and is worth stating because it is not
+    # obvious from a failure: ApplicationType here is `Windows Store`, which this project needs and
+    # cannot drop (see the comment on it in the .vcxproj), and that pulls in the Universal Windows
+    # Platform build tools *for whichever toolset is chosen* rather than the C++ compiler alone.
+    # Asking for a toolset whose compiler is present but whose UWP component is not fails with
+    # MSB8020 -- "the build tools for 'vNNN' application Type UWP cannot be found" -- which was
+    # confirmed by hand on the development machine rather than by a run of red builds.
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,12 +123,18 @@ jobs:
             }
           }
 
+          # VCPKG_ROOT is what the presets read; the runner calls the same thing
+          # VCPKG_INSTALLATION_ROOT. Copied here rather than through `${{ env.X }}` in a step's env
+          # block, which does not work and does not complain: that expression reads the workflow's
+          # own env map, not the runner's process environment, so a variable the image exports comes
+          # through empty. The symptom is a toolchain file at "/scripts/buildsystems/vcpkg.cmake"
+          # with nothing in front of it.
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
       # The application links what CMake built, through the props file CMake generates. Building it
       # is not optional here even though this job does not test it: MSBuild reads TsguiHost props for
       # the include paths and the static libraries, and without them it stops at the first #include.
       - name: Configure and build the engine
-        env:
-          VCPKG_ROOT: ${{ env.VCPKG_INSTALLATION_ROOT }}
         run: |
           cmake --preset release
           cmake --build --preset release
@@ -124,15 +142,15 @@ jobs:
       - name: Restore
         run: >
           msbuild src\app\WindowsTSPlayer.vcxproj -t:Restore
-          -p:Configuration=Release -p:Platform=x64 -p:PlatformToolset=v143
+          -p:Configuration=Release -p:Platform=x64
 
-      # PlatformToolset is passed rather than left to the project, which defaults to the v145 of
-      # Build Tools 2026. Restore needs it too: the C++ project system resolves package .props at
-      # evaluation time, so the two invocations have to agree on which toolset they are evaluating.
+      # Restore is a separate invocation rather than -restore on the build, matching build.ps1 and
+      # for the same reason: the C++ project system resolves package .props at evaluation time, so a
+      # single pass would evaluate this project before the packages it imports exist.
       - name: Build
         run: >
           msbuild src\app\WindowsTSPlayer.vcxproj
-          -p:Configuration=Release -p:Platform=x64 -p:PlatformToolset=v143
+          -p:Configuration=Release -p:Platform=x64
 
       # The loose layout, which is what `Add-AppxPackage -Register` takes. Uploaded unsigned and
       # unregistered: it is here to be looked at, not installed, and it needs a licensed SCCore.dll
